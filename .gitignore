@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+env.txt
+agentmail_api_key_*.txt
+*_api_key*.txt
+*.tar.gz
+*.log
+.DS_Store
+coverage/
+apps/web/dist/
+apps/worker/worker-configuration.d.ts

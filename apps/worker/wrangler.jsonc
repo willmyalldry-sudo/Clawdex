@@ -1,0 +1,123 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "benjamin-os",
+  "account_id": "fd3c942ae1ce7fbd1a4b230ba5244d66",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/webhooks/*", "/unsubscribe", "/book", "/crawler-policy"]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 }
+  },
+  "secrets": {
+    "required": [
+      "TINYFISH_API_KEY",
+      "APOLLO_API_KEY",
+      "AGENTMAIL_API_KEY",
+      "AGENTMAIL_WEBHOOK_SECRET",
+      "UNSUBSCRIBE_SECRET"
+    ]
+  },
+  "vars": {
+    "APP_NAME": "Benjamin Persyn Agent OS",
+    "AUTH_MODE": "access",
+    "OUTREACH_MODE": "disabled",
+    "PUBLIC_APP_URL": "https://benjamin-os.solutionspartner.workers.dev",
+    "POSTAL_ADDRESS": "2485 Village View Dr #190, Henderson, NV 89074",
+    "ADVISER_DISCLOSURE": "Benjamin Persyn is a Nevada Licensed Financial Advisor (License #3821594) with Appreciation Financial. Educational information only. This communication is not individualized investment, tax, or legal advice.",
+    "ADVISER_FIRM": "Appreciation Financial",
+    "ADVISER_LICENSE_NUMBER": "3821594",
+    "ADVISER_PHONE": "(775) 842-7017",
+    "ADVISER_PUBLIC_EMAIL": "bpersyn@appreciationfinancial.com",
+    "ADVISER_WEBSITE": "https://appreciationfinancial.com",
+    "SENDGRID_API_BASE": "https://api.sendgrid.com/v3",
+    "TWILIO_API_BASE": "https://api.twilio.com/2010-04-01",
+    "PDL_API_BASE": "https://api.peopledatalabs.com/v5",
+    "ZEROBOUNCE_API_BASE": "https://api.zerobounce.net/v2",
+    "TINYFISH_FETCH_API_BASE": "https://api.fetch.tinyfish.ai",
+    "TINYFISH_SEARCH_API_BASE": "https://api.search.tinyfish.ai",
+    "PARALLEL_API_BASE": "https://api.parallel.ai/v1",
+    "APOLLO_API_BASE": "https://api.apollo.io/api/v1",
+    "ENRICHMENT_PROVIDER_MODE": "apollo_first",
+    "AGENTMAIL_API_BASE": "https://api.agentmail.to/v0",
+    "AGENTMAIL_INBOX_ID": "nevadaeducators@agentmail.to",
+    "AGENTMAIL_SMTP_HOST": "smtp.agentmail.to",
+    "AGENTMAIL_SMTP_PORT": "465",
+    "AGENTMAIL_SMTP_SECURITY": "implicit_tls",
+    "AGENTMAIL_IMAP_HOST": "imap.agentmail.to",
+    "AGENTMAIL_IMAP_PORT": "993",
+    "AGENTMAIL_IMAP_SECURITY": "tls",
+    "AUTOSEND_API_BASE": "https://api.autosend.com/v1",
+    "AUTOSEND_PROJECT_ID": "69f221ce39db849a50f16a8b",
+    "AUTOSEND_PROJECT_SLUG": "teachers-retirement",
+    "AUTOSEND_FROM_NAME": "Benjamin Persyn",
+    "AUTOSEND_DEFAULT_FROM_EMAIL": "benjamin@afinancial.org",
+    "AUTOSEND_SECONDARY_FROM_EMAIL": "benjamin@aureviaretirement.com",
+    "AUTOSEND_REPLY_TO_EMAIL": "services@afinancialpartner.com",
+    "AUTOSEND_MCP_URL": "https://mcp.autosend.com/",
+    "AUTOSEND_BACKUP_PROJECT_ID": "6a1351681bdbd06a4a4065b3",
+    "AUTOSEND_BACKUP_PROJECT_SLUG": "johnita/brian",
+    "AUTOSEND_BACKUP_FROM_NAME": "Brian Persyn",
+    "AUTOSEND_BACKUP_PRIMARY_EMAIL": "educators@403bclarity.org",
+    "AUTOSEND_BACKUP_SECONDARY_EMAIL": "notification@teachersretirement.info",
+    "EMAIL_PROVIDER_MODE": "agentmail_first",
+    "SEARCH_PROVIDER_MODE": "multi",
+    "CRAWL_PROVIDER_MODE": "parallel_first",
+    "FROM_EMAIL": "nevadaeducators@agentmail.to",
+    "FROM_NAME": "Benjamin Persyn | Appreciation Financial",
+    "REPLY_TO_EMAIL": "services@afinancialpartner.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agent-os-db",
+      "database_id": "4e3c9d3e-2c39-4540-949a-67e9ca943800",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "EVIDENCE",
+      "bucket_name": "benjamin-agent-os-evidence"
+    }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "AGENT_QUEUE", "queue": "benjamin-agent-jobs" }
+    ],
+    "consumers": [
+      {
+        "queue": "benjamin-agent-jobs",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "max_concurrency": 5,
+        "dead_letter_queue": "benjamin-agent-jobs-dlq"
+      },
+      {
+        "queue": "benjamin-agent-jobs-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 0,
+        "max_concurrency": 1
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "name": "benjamin-outreach-sequence",
+      "binding": "OUTREACH_SEQUENCE",
+      "class_name": "OutreachSequenceWorkflow"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 14 * * 1-5"]
+  }
+}

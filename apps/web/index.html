@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#102a43" />
+    <meta name="description" content="Benjamin Persyn Agent OS — compliant lead intelligence and outreach operations for Nevada educators." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      (function (m, e, s, h, a, i, c) {
+        m[a] = m[a] || function () {
+          (m[a].q = m[a].q || []).push(arguments);
+        };
+        var o = document.createElement(s);
+        o.type = "text/javascript";
+        o.id = "mesh-analytics-sdk";
+        o.async = true;
+        o.src = h;
+        o.setAttribute("data-mesh-sdk", i);
+        o.setAttribute("data-mesh-sdk-attributes", JSON.stringify(c));
+        var x = document.getElementsByTagName(s)[0];
+        x.parentNode.insertBefore(o, x);
+      })(
+        window,
+        document,
+        "script",
+        "https://cdn.jsdelivr.net/npm/@mesh-interactive/mesh-sdk@latest/dist/umd/index.js",
+        "mesh",
+        "fc9ba7e51f64c9410ce274c0c1b20300",
+        { useFingerprint: false, track: { session: true, forms: true } },
+      );
+    </script>
+    <title>Benjamin Persyn Agent OS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

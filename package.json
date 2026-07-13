@@ -1,0 +1,46 @@
+{
+  "name": "benjamin-persyn-agent-os",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n WEB,API -c cyan,magenta \"npm:dev:web\" \"npm:dev:worker\"",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "dev:worker": "wrangler dev --config apps/worker/wrangler.jsonc --local --persist-to .wrangler/state",
+    "build": "npm run typecheck && vite build --config apps/web/vite.config.ts && wrangler deploy --config apps/worker/wrangler.jsonc --dry-run --outdir dist/worker",
+    "typecheck": "tsc -b",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "cf:types": "wrangler types --config apps/worker/wrangler.jsonc apps/worker/worker-configuration.d.ts",
+    "db:migrate:local": "wrangler d1 migrations apply agent-os-db --local --persist-to .wrangler/state --config apps/worker/wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply agent-os-db --remote --config apps/worker/wrangler.jsonc",
+    "db:seed:local": "wrangler d1 execute agent-os-db --local --persist-to .wrangler/state --file apps/worker/seeds/demo.sql --config apps/worker/wrangler.jsonc",
+    "deploy": "npm run build:web && wrangler deploy --config apps/worker/wrangler.jsonc",
+    "build:web": "vite build --config apps/web/vite.config.ts"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.2",
+    "agentmail": "^0.5.14",
+    "hono": "^4.9.6",
+    "lucide-react": "^0.544.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "svix": "^1.96.1",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.4",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.4",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.35.0"
+  }
+}

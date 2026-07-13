@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "WebWorker"],
+    "baseUrl": "../..",
+    "paths": {
+      "@agent-os/shared": ["packages/shared/src/index.ts"]
+    },
+    "outDir": "../../dist/types/worker"
+  },
+  "include": ["src/**/*.ts", "worker-configuration.d.ts"],
+  "references": [{ "path": "../../packages/shared" }]
+}
