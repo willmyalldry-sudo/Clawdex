@@ -19,6 +19,8 @@
   "vars": {
     "APP_NAME": "Benjamin Persyn Agent OS",
     "AUTH_MODE": "access",
+    "CF_ACCESS_TEAM_DOMAIN": "",
+    "CF_ACCESS_AUD": "",
     "OUTREACH_MODE": "disabled",
     "PUBLIC_APP_URL": "https://benjamin-os.solutionspartner.workers.dev",
     "POSTAL_ADDRESS": "2485 Village View Dr #190, Henderson, NV 89074",

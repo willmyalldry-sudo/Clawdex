@@ -106,6 +106,17 @@ Optional: `PDL_API_KEY`, `AUTOSEND_API_KEY`, `AUTOSEND_WEBHOOK_SECRET`, `CALENDL
 
 Set production values with `wrangler secret put`; never commit credentials. The production Worker uses Hyperdrive for database traffic and also retains `DATABASE_URL` as the required secret/fallback.
 
+## Cloudflare Access verification
+
+`/api/*` and `/agents/*` require a Cloudflare Access application in front of the Worker's hostname. The Worker does not just check that Access headers are present — `lib/auth.ts` cryptographically verifies the `cf-access-jwt-assertion` JWT against the team's JWKS (`jose`'s `createRemoteJWKSet`/`jwtVerify`), checking `iss` and `aud`. Two non-secret vars in `wrangler.jsonc` configure this and must hold real values before production traffic depends on Access:
+
+```text
+CF_ACCESS_TEAM_DOMAIN   # https://<your-team-name>.cloudflareaccess.com
+CF_ACCESS_AUD           # the Access application's Application Audience (AUD) tag
+```
+
+If either is empty, verification fails closed (every `/api/*` and `/agents/*` request is rejected) rather than trusting an unverified header. `AUTH_MODE=development` bypasses Access entirely for local dev.
+
 ## Webhooks
 
 ```text

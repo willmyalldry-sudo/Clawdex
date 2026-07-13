@@ -4,13 +4,14 @@
 
 - [x] `npm run cf:types`
 - [x] `npm run typecheck`
-- [x] `npm test` — 25 tests
+- [x] `npm test` — 29 tests
 - [x] `npm run build:web`
 - [x] `npm run build` Worker dry-run
 - [x] Neon migrations and seed applied
 - [x] 12 core tables verified, 16 queries seeded, 4 sequence steps seeded
 - [x] Live `/api/health` confirms Neon + Hyperdrive
 - [x] Live operational API rejects requests without Cloudflare Access
+- [x] Cloudflare Access JWT signature is cryptographically verified (`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`), not just header presence
 - [x] Live Worker reports `OUTREACH_MODE=disabled`
 
 ## Search and evidence
@@ -51,6 +52,7 @@
 - [ ] SPF, DKIM, DMARC and sender identity verification
 - [ ] Imported global suppression lists
 - [ ] Cloudflare Access policy reviewed in dashboard
+- [ ] `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` set to the real Access application values (Worker fails closed on every operational route while these are empty)
 - [ ] Compliance/supervisory activation approval
 - [ ] End-to-end internal sequence tests
 - [ ] Visual desktop/mobile browser QA (browser connector unavailable during this release run)

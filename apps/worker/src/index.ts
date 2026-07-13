@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { routeAgentRequest } from "agents";
 import { signalJobSchema } from "@agent-os/shared";
 import type { AppBindings } from "./lib/auth";
+import { verifyAccessJwt } from "./lib/auth";
 import { api } from "./routes/api";
 import { webhooks } from "./routes/webhooks";
 import { scheduleHourlyRun, processSignalJob, PermanentJobError } from "./lib/autonomous-pipeline";
@@ -54,13 +55,16 @@ const handler = {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/agents/")) {
       const development = String(env.AUTH_MODE) === "development";
-      const accessAuthenticated = Boolean(request.headers.get("cf-access-authenticated-user-email") && request.headers.get("cf-access-jwt-assertion"));
       const oauthCallback = request.method === "GET"
         && url.pathname.endsWith("/callback")
         && url.searchParams.has("state")
         && (url.searchParams.has("code") || url.searchParams.has("error"));
-      if (!development && !accessAuthenticated && !oauthCallback) {
-        return Response.json({ error: { code: "unauthorized", message: "Cloudflare Access authentication is required." } }, { status: 401 });
+      if (!development && !oauthCallback) {
+        const accessJwt = request.headers.get("cf-access-jwt-assertion");
+        const verified = accessJwt ? await verifyAccessJwt(env, accessJwt).then(() => true, () => false) : false;
+        if (!verified) {
+          return Response.json({ error: { code: "unauthorized", message: "Cloudflare Access authentication is required." } }, { status: 401 });
+        }
       }
     }
     const agentResponse = await routeAgentRequest(request, env);

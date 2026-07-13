@@ -30,7 +30,7 @@ Cron 5 * * * *
 ## Trust boundaries
 
 - Only `/api/health`, provider webhooks, unsubscribe, booking redirect, crawler policy, and static assets are public.
-- Operational routes require Cloudflare Access headers.
+- Operational routes require Cloudflare Access; the Worker verifies the `cf-access-jwt-assertion` JWT signature against the team's JWKS (`iss`/`aud` checked via `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`), not just header presence, and fails closed if those vars are unset.
 - Provider secrets are Worker secrets; database credentials are in Hyperdrive/secret storage.
 - Queue jobs are Zod-validated and idempotent; each message is explicitly acknowledged or retried.
 - External content is bounded, archived, policy-checked, and treated as untrusted.
