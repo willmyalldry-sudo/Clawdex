@@ -1,4 +1,4 @@
-export type PageId = "dashboard" | "leads" | "signals" | "campaigns" | "approvals" | "analytics" | "sources" | "settings";
+export type PageId = "dashboard" | "leads" | "signals" | "campaigns" | "approvals" | "analytics" | "sources" | "mcp" | "settings";
 
 export interface Lead {
   id: string;

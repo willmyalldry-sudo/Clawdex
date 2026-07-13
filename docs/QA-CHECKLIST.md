@@ -1,77 +1,58 @@
-# QA and Release Checklist
+# QA and release checklist
 
-## Automated
+## Automated release checks
 
-- [ ] `npm run typecheck`
-- [ ] `npm test`
-- [ ] `npm run build:web`
-- [ ] `npm run build` completes the Worker dry run
-- [ ] Local and remote D1 migrations apply cleanly
-- [ ] `wrangler types` matches all bindings
+- [x] `npm run cf:types`
+- [x] `npm run typecheck`
+- [x] `npm test` — 25 tests
+- [x] `npm run build:web`
+- [x] `npm run build` Worker dry-run
+- [x] Neon migrations and seed applied
+- [x] 12 core tables verified, 16 queries seeded, 4 sequence steps seeded
+- [x] Live `/api/health` confirms Neon + Hyperdrive
+- [x] Live operational API rejects requests without Cloudflare Access
+- [x] Live Worker reports `OUTREACH_MODE=disabled`
 
-## Lead intelligence
+## Search and evidence
 
-- [ ] CSV import accepts quoted values and rejects malformed lead records
-- [ ] Duplicate email import does not create a second lead
-- [ ] Enrichment failure retries without losing the original lead
-- [ ] Validation status maps correctly and invalid email cannot send
-- [ ] No age, asset, or retirement-date inference appears in lead scoring
+- [x] Query cooldown and hourly-run dedupe
+- [x] Parallel/TinyFish merge and canonical URL dedupe
+- [x] Automatic official-domain allow and restricted-source quarantine
+- [x] `robots.txt` most-specific allow/disallow behavior
+- [x] Bounded fetch, content hash, evidence excerpt, and R2 snapshot
+- [x] Stale signal and missing evidence qualification blocks
 
-## Crawling
+## Teacher, enrichment, and validation
 
-- [ ] Parallel and TinyFish Search results are merged, URL-normalized, and deduplicated
-- [ ] Non-registry discoveries create unapproved candidates only
-- [ ] Nevada search rotation covers every official county district and is deterministic per seed/day
-- [ ] Texas TRS, Rule of 80/85, DROP, and non-retirement noise are excluded
-- [ ] All person-level signals remain `pending_human_review` and `outreach_eligible = 0`
-- [ ] Rejected sources cannot crawl
-- [ ] `robots.txt` disallow prevents fetch
-- [ ] Native, TinyFish, and Parallel content limits reject oversized responses
-- [ ] Same source content does not duplicate a signal
-- [ ] Evidence archive includes URL, retrieval timestamp, run ID, and hash
+- [x] Target-role allowlist and administrator exclusions
+- [x] Current employment and identity confidence required
+- [x] Personal, free, role, guessed, catch-all, and employer-mismatch emails blocked
+- [x] Apollo requests exclude personal reveal fields
+- [x] ZeroBounce `valid` is the only accepted runtime status
+- [x] Suppression, terminal event, and active enrollment cannot be bypassed
 
-## Outreach safety
+## Message and sequence
 
-- [ ] Prohibited guarantees and promissory claims block campaign submission
-- [ ] Missing disclosure, postal address, or unsubscribe token blocks submission
-- [ ] Changed campaign content requires a new approval/version
-- [ ] Duplicate enrollment and queue events do not duplicate messages
-- [ ] `OUTREACH_MODE=disabled` captures but never sends a message
-- [ ] Newsletter send without consent fails
-- [ ] Marketing SMS without consent fails
-- [ ] Reply, booking, unsubscribe, complaint, and bounce stop active sequences
+- [x] Day 1, 3, 5, and 7 Workflow
+- [x] Signal-specific message fields
+- [x] Seven-word subject, one CTA, disclosure, postal address, unsubscribe
+- [x] Prohibited claims and sensitive inference block
+- [x] Hourly/daily caps and Nevada sending window
+- [x] AgentMail-only and controlled AutoSend routing code
+- [x] Signed/timestamped webhook verification and event dedupe
+- [x] Transactional stop/cancel/suppress behavior
+- [ ] Signed provider sandbox fixtures for every terminal event
 
-## Provider integration
+## Production blockers
 
-- [ ] AgentMail key authenticates and the configured inbox ID exists
-- [ ] AgentMail send uses the approved message version, Reply-To, disclosure, postal address, and one-click unsubscribe headers
-- [ ] Invalid AgentMail Svix signatures return 401
-- [ ] Replies stop active sequences; bounces, complaints, and rejections add suppressions
-- [ ] Duplicate AgentMail lifecycle events do not duplicate the event ledger
-- [ ] Apollo health authentication succeeds without exposing the API key
-- [ ] Apollo enrichment requests keep personal email and phone reveal disabled
-- [ ] Consumer or employer-domain-mismatched emails are rejected
-- [ ] Enriched leads remain in human-review status before outreach
-- [ ] SendGrid event signature passes valid payload and rejects tampering
-- [ ] Twilio signature passes valid payload and rejects tampering
-- [ ] Calendly signature passes valid payload and rejects tampering
-- [ ] Inbound email token is rotated and not present in logs
-- [ ] Provider timeouts and 429/5xx responses enter retry flow
-- [ ] Exhausted jobs appear in the dead-letter review activity
+- [ ] `PARALLEL_API_KEY`
+- [ ] `ZEROBOUNCE_API_KEY`
+- [ ] Optional PDL/AutoSend/Calendly credentials if enabled
+- [ ] SPF, DKIM, DMARC and sender identity verification
+- [ ] Imported global suppression lists
+- [ ] Cloudflare Access policy reviewed in dashboard
+- [ ] Compliance/supervisory activation approval
+- [ ] End-to-end internal sequence tests
+- [ ] Visual desktop/mobile browser QA (browser connector unavailable during this release run)
 
-## User experience
-
-- [ ] Dashboard, tables, drawers, and modals work at 320px, 768px, and desktop widths
-- [ ] Keyboard navigation reaches sidebar, filters, tables, and modal controls
-- [ ] Focus remains visible and modal closing is predictable
-- [ ] No broken links or console errors
-- [ ] Empty, loading, error, and demo states are understandable
-- [ ] Headline analytics exclude unreliable email-open metrics
-
-## Writer policy
-
-- [ ] Subject lines are transparent and no more than seven words
-- [ ] Drafts include first name and one reviewed professional personalization detail
-- [ ] Drafts use two or three short paragraphs and one clear CTA
-- [ ] Sensitive, private, or inferred personalization is rejected
-- [ ] Writer output cannot bypass campaign preflight or human approval
+Keep `OUTREACH_MODE=disabled` until every production blocker is closed.

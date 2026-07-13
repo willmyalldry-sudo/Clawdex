@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import {
-  Activity, BarChart3, Bell, Bot, CheckSquare2, DatabaseZap, LayoutDashboard, Megaphone,
+  Activity, BarChart3, Bell, Bot, Cable, CheckSquare2, DatabaseZap, LayoutDashboard, Megaphone,
   Menu, Radar, Search, Settings2, ShieldCheck, Sparkles, Users, X,
 } from "lucide-react";
 import type { PageId } from "../lib/types";
@@ -11,9 +11,10 @@ export const navItems: Array<{ id: PageId; label: string; icon: typeof Activity;
   { id: "leads", label: "Lead intelligence", icon: Users, group: "Operate" },
   { id: "signals", label: "Signal feed", icon: Radar, group: "Operate" },
   { id: "campaigns", label: "Campaigns", icon: Megaphone, group: "Engage" },
-  { id: "approvals", label: "Approval center", icon: CheckSquare2, group: "Engage" },
+  { id: "approvals", label: "Safety blocks", icon: CheckSquare2, group: "Engage" },
   { id: "analytics", label: "Analytics", icon: BarChart3, group: "Measure" },
   { id: "sources", label: "Sources & agents", icon: DatabaseZap, group: "System" },
+  { id: "mcp", label: "MCP control agent", icon: Cable, group: "System" },
   { id: "settings", label: "Compliance", icon: ShieldCheck, group: "System" },
 ];
 
@@ -47,13 +48,12 @@ export function Layout({ page, onNavigate, mobileOpen, onMobileOpen, children, o
             const Icon = item.icon;
             return <button key={item.id} className={`nav-item ${page === item.id ? "active" : ""}`} onClick={() => { onNavigate(item.id); onMobileOpen(false); }}>
               <Icon size={18} strokeWidth={1.8} /><span>{item.label}</span>
-              {item.id === "approvals" && <span className="nav-badge">2</span>}
             </button>;
           })}
         </div>)}
       </nav>
       <div className="sidebar-footer">
-        <div className="system-status"><Bot size={16} /><div><strong>9 agents ready</strong><span>Compliance guard active</span></div><span className="pulse" /></div>
+        <div className="system-status"><Bot size={16} /><div><strong>Hourly pipeline ready</strong><span>Fail-closed guard active</span></div><span className="pulse" /></div>
         <button className="nav-item" onClick={() => onNavigate("settings")}><Settings2 size={18} /><span>Workspace settings</span></button>
       </div>
     </aside>

@@ -1,218 +1,235 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { Webhook } from "svix";
 import type { AppBindings } from "../lib/auth";
-import { constantTimeEqual, nowIso, sha256, uuid } from "../lib/utils";
-import { stopEnrollments, writeActivity } from "../lib/db";
+import { neonQuery, neonTransaction } from "../lib/neon";
+import { constantTimeEqual, nowIso, sha256 } from "../lib/utils";
 
 export const webhooks = new Hono<AppBindings>();
 
-webhooks.post("/agentmail/events", async (c) => {
-  const rawBody = await readSmallBody(c.req.raw);
-  const event = verifyAgentMailEvent(c.req.raw.headers, rawBody, c.env.AGENTMAIL_WEBHOOK_SECRET);
+const TERMINAL_EVENTS = new Set([
+  "reply", "positive_reply", "negative_reply", "booking", "unsubscribe", "complaint",
+  "hard_bounce", "invalid_email", "rejected", "spam_report", "manual_global_suppression",
+  "provider_suppression",
+]);
+const SUPPRESSION_EVENTS = new Set(["unsubscribe", "complaint", "hard_bounce", "invalid_email", "rejected", "spam_report", "provider_suppression"]);
+
+webhooks.post("/agentmail", handleAgentMail);
+webhooks.post("/agentmail/events", handleAgentMail);
+
+async function handleAgentMail(c: Context<AppBindings>) {
+  const raw = await readSmallBody(c.req.raw);
+  const event = verifyAgentMailEvent(c.req.raw.headers, raw, c.env.AGENTMAIL_WEBHOOK_SECRET);
   if (!event) return c.json({ error: "invalid signature" }, 401);
 
-  const eventType = stringValue(event.event_type);
-  const eventId = stringValue(event.event_id) || await sha256(rawBody);
-  if (eventType === "message.received") {
-    const incoming = objectValue(event.message);
-    const email = extractEmail(stringValue(incoming.from));
-    const lead = email ? await c.env.DB.prepare("SELECT id, first_name, last_name FROM leads WHERE lower(email) = lower(?)").bind(email).first<{ id: string; first_name: string; last_name: string }>() : null;
-    if (lead) {
-      await c.env.DB.batch([
-        c.env.DB.prepare("INSERT OR IGNORE INTO outreach_events (id, lead_id, event_type, provider, provider_event_id, occurred_at, metadata_json) VALUES (?, ?, 'reply', 'agentmail', ?, ?, ?)")
-          .bind(uuid(), lead.id, eventId, stringValue(incoming.timestamp) || nowIso(), JSON.stringify({ subject: stringValue(incoming.subject).slice(0, 300), excerpt: (stringValue(incoming.extracted_text) || stringValue(incoming.text) || stringValue(incoming.preview)).slice(0, 500), threadId: stringValue(incoming.thread_id), messageId: stringValue(incoming.message_id) })),
-        c.env.DB.prepare("UPDATE leads SET status = 'replied', updated_at = ? WHERE id = ?").bind(nowIso(), lead.id),
-      ]);
-      await stopEnrollments(c.env.DB, lead.id, "reply");
-      await writeActivity(c.env.DB, { actorType: "system", actorName: "AgentMail Reply Router", action: "lead.replied", entityType: "lead", entityId: lead.id, detail: `${lead.first_name} ${lead.last_name} replied; active sequences were stopped for human follow-up.`, severity: "success" });
-    }
-    return c.json({ accepted: true, matched: Boolean(lead) });
-  }
+  const providerEventId = stringValue(event.event_id) || c.req.header("svix-id") || await sha256(raw);
+  const providerType = stringValue(event.event_type || event.type);
+  const payload = objectValue(event.message || event.data || event.send || event.delivery || event.bounce || event.complaint || event.reject);
+  const mappedType = mapAgentMailEvent(providerType);
+  if (!mappedType) return c.json({ accepted: true, ignored: true });
 
-  const payloadKey = eventType === "message.sent" ? "send" : eventType === "message.delivered" ? "delivery" : eventType === "message.bounced" ? "bounce" : eventType === "message.complained" ? "complaint" : eventType === "message.rejected" ? "reject" : "";
-  if (!payloadKey) return c.json({ accepted: true, ignored: true });
-  const payload = objectValue(event[payloadKey]);
-  const providerMessageId = stringValue(payload.message_id);
-  const message = providerMessageId ? await c.env.DB.prepare("SELECT id, lead_id FROM messages WHERE provider = 'agentmail' AND provider_message_id = ?").bind(providerMessageId).first<{ id: string; lead_id: string }>() : null;
-  if (!message) return c.json({ accepted: true, matched: false });
+  const providerMessageId = stringValue(payload.message_id || payload.id || event.message_id);
+  const replyEmail = mappedType === "reply" ? extractEmail(stringValue(payload.from || event.from)) : null;
+  const result = await ingestEvent(c.env, {
+    provider: "agentmail", providerEventId, providerMessageId, eventType: mappedType,
+    occurredAt: stringValue(payload.timestamp || event.timestamp) || nowIso(), replyEmail, raw,
+  });
+  return c.json({ accepted: true, ...result });
+}
 
-  const mappedType = eventType === "message.delivered" ? "delivered" : eventType === "message.bounced" ? "bounce" : eventType === "message.complained" ? "spam_complaint" : eventType === "message.rejected" ? "dropped" : "sent";
-  await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO outreach_events (id, message_id, lead_id, event_type, provider, provider_event_id, occurred_at, metadata_json) VALUES (?, ?, ?, ?, 'agentmail', ?, ?, ?)",
-  ).bind(uuid(), message.id, message.lead_id, mappedType, eventId, stringValue(payload.timestamp) || nowIso(), JSON.stringify({ threadId: stringValue(payload.thread_id), type: stringValue(payload.type), subType: stringValue(payload.sub_type), reason: stringValue(payload.reason) })).run();
-
-  if (["bounce", "spam_complaint", "dropped"].includes(mappedType)) {
-    const lead = await c.env.DB.prepare("SELECT email FROM leads WHERE id = ?").bind(message.lead_id).first<{ email: string | null }>();
-    if (lead?.email) await c.env.DB.prepare("INSERT OR IGNORE INTO suppressions (id, lead_id, channel, value, reason, source) VALUES (?, ?, 'email', ?, ?, 'agentmail')")
-      .bind(uuid(), message.lead_id, lead.email, mappedType).run();
-    await stopEnrollments(c.env.DB, message.lead_id, mappedType);
-    await c.env.DB.prepare("UPDATE messages SET status = ?, updated_at = ? WHERE id = ?").bind(mappedType, nowIso(), message.id).run();
-  } else if (mappedType === "delivered") {
-    await c.env.DB.prepare("UPDATE messages SET status = 'delivered', updated_at = ? WHERE id = ? AND status = 'sent'").bind(nowIso(), message.id).run();
-  }
-  return c.json({ accepted: true, matched: true });
-});
-
-webhooks.post("/sendgrid/events", async (c) => {
-  const rawBody = await readSmallBody(c.req.raw);
-  if (!c.env.SENDGRID_WEBHOOK_PUBLIC_KEY || !(await verifySendGridSignature(c.req.raw.headers, rawBody, c.env.SENDGRID_WEBHOOK_PUBLIC_KEY))) {
-    return c.json({ error: "invalid signature" }, 401);
-  }
-  const events = JSON.parse(rawBody) as Array<Record<string, unknown>>;
-  for (const event of events.slice(0, 1_000)) {
-    const providerEventId = stringValue(event.sg_event_id) || await sha256(JSON.stringify(event));
-    const providerMessageId = stringValue(event.sg_message_id).split(".")[0] ?? "";
-    const messageId = stringValue(event.message_id);
-    const eventType = mapSendGridEvent(stringValue(event.event));
-    const occurredAt = typeof event.timestamp === "number" ? new Date(event.timestamp * 1_000).toISOString() : nowIso();
-    const message = messageId
-      ? await c.env.DB.prepare("SELECT id, lead_id FROM messages WHERE id = ?").bind(messageId).first<{ id: string; lead_id: string }>()
-      : await c.env.DB.prepare("SELECT id, lead_id FROM messages WHERE provider_message_id LIKE ? LIMIT 1").bind(`${providerMessageId}%`).first<{ id: string; lead_id: string }>();
-    if (!message) continue;
-    await c.env.DB.prepare(
-      `INSERT OR IGNORE INTO outreach_events (id, message_id, lead_id, event_type, provider, provider_event_id, occurred_at, metadata_json)
-       VALUES (?, ?, ?, ?, 'sendgrid', ?, ?, ?)`,
-    ).bind(uuid(), message.id, message.lead_id, eventType, providerEventId, occurredAt, JSON.stringify(redactEvent(event))).run();
-    if (["bounce", "dropped", "spam_complaint", "unsubscribe"].includes(eventType)) {
-      const lead = await c.env.DB.prepare("SELECT email FROM leads WHERE id = ?").bind(message.lead_id).first<{ email: string | null }>();
-      if (lead?.email) await c.env.DB.prepare("INSERT OR IGNORE INTO suppressions (id, lead_id, channel, value, reason, source) VALUES (?, ?, 'email', ?, ?, 'sendgrid')")
-        .bind(uuid(), message.lead_id, lead.email, eventType).run();
-      await stopEnrollments(c.env.DB, message.lead_id, eventType);
-      await c.env.DB.prepare("UPDATE messages SET status = ?, updated_at = ? WHERE id = ?").bind(eventType, nowIso(), message.id).run();
-    }
-  }
-  return c.json({ accepted: true });
-});
-
-webhooks.post("/sendgrid/inbound", async (c) => {
-  const token = c.req.query("token") ?? c.req.header("x-agent-os-webhook-token") ?? "";
-  if (!c.env.INBOUND_WEBHOOK_TOKEN || !(await constantTimeEqual(token, c.env.INBOUND_WEBHOOK_TOKEN))) return c.json({ error: "unauthorized" }, 401);
-  const length = Number(c.req.header("content-length") ?? 0);
-  if (length > 1_000_000) return c.json({ error: "payload too large" }, 413);
-  const form = await c.req.formData();
-  const from = String(form.get("from") ?? "");
-  const email = extractEmail(from);
-  const subject = String(form.get("subject") ?? "").slice(0, 300);
-  const text = String(form.get("text") ?? "").slice(0, 5_000);
-  const lead = email ? await c.env.DB.prepare("SELECT id, first_name, last_name FROM leads WHERE lower(email) = lower(?)").bind(email).first<{ id: string; first_name: string; last_name: string }>() : null;
-  if (lead) {
-    const eventId = await sha256(`${lead.id}:${subject}:${text}`);
-    await c.env.DB.batch([
-      c.env.DB.prepare("INSERT OR IGNORE INTO outreach_events (id, lead_id, event_type, provider, provider_event_id, occurred_at, metadata_json) VALUES (?, ?, 'reply', 'sendgrid_inbound', ?, ?, ?)")
-        .bind(uuid(), lead.id, eventId, nowIso(), JSON.stringify({ subject, excerpt: text.slice(0, 500) })),
-      c.env.DB.prepare("UPDATE leads SET status = 'replied', updated_at = ? WHERE id = ?").bind(nowIso(), lead.id),
-    ]);
-    await stopEnrollments(c.env.DB, lead.id, "reply");
-    await writeActivity(c.env.DB, { actorType: "system", actorName: "Reply Router", action: "lead.replied", entityType: "lead", entityId: lead.id, detail: `${lead.first_name} ${lead.last_name} replied; active sequences were stopped.`, severity: "success" });
-  }
-  return c.json({ accepted: true, matched: Boolean(lead) });
-});
-
-webhooks.post("/twilio/status", async (c) => {
+webhooks.post("/autosend", async (c) => {
   const raw = await readSmallBody(c.req.raw);
-  if (!c.env.TWILIO_AUTH_TOKEN || !(await verifyTwilioSignature(c.req.url, raw, c.req.header("x-twilio-signature") ?? "", c.env.TWILIO_AUTH_TOKEN))) return c.json({ error: "invalid signature" }, 401);
-  const form = new URLSearchParams(raw);
-  const sid = form.get("MessageSid") ?? "";
-  const status = form.get("MessageStatus") ?? "unknown";
-  const message = await c.env.DB.prepare("SELECT id, lead_id FROM messages WHERE provider_message_id = ?").bind(sid).first<{ id: string; lead_id: string }>();
-  if (message) {
-    await c.env.DB.prepare("INSERT OR IGNORE INTO outreach_events (id, message_id, lead_id, event_type, provider, provider_event_id, occurred_at, metadata_json) VALUES (?, ?, ?, ?, 'twilio', ?, ?, ?)")
-      .bind(uuid(), message.id, message.lead_id, status, `${sid}:${status}`, nowIso(), JSON.stringify({ status })).run();
-    if (["failed", "undelivered"].includes(status)) await c.env.DB.prepare("UPDATE messages SET status = ?, updated_at = ? WHERE id = ?").bind(status, nowIso(), message.id).run();
-  }
-  return c.body(null, 204);
+  if (!c.env.AUTOSEND_WEBHOOK_SECRET || !(await verifyTimestampedHmac(
+    raw,
+    c.req.header("x-autosend-signature") || c.req.header("webhook-signature") || "",
+    c.req.header("x-autosend-timestamp") || c.req.header("webhook-timestamp") || "",
+    c.env.AUTOSEND_WEBHOOK_SECRET,
+  ))) return c.json({ error: "invalid signature" }, 401);
+
+  const event = JSON.parse(raw) as Record<string, unknown>;
+  const data = objectValue(event.data || event.payload);
+  const providerType = stringValue(event.type || event.event);
+  const mappedType = mapDeliveryEvent(providerType);
+  if (!mappedType) return c.json({ accepted: true, ignored: true });
+  const providerEventId = stringValue(event.id || event.event_id) || await sha256(raw);
+  const providerMessageId = stringValue(data.message_id || data.id || event.message_id);
+  const replyEmail = mappedType === "reply" ? extractEmail(stringValue(data.from || event.from)) : null;
+  const result = await ingestEvent(c.env, {
+    provider: "autosend", providerEventId, providerMessageId, eventType: mappedType,
+    occurredAt: stringValue(event.created_at || data.timestamp) || nowIso(), replyEmail, raw,
+  });
+  return c.json({ accepted: true, ...result });
 });
 
 webhooks.post("/calendly", async (c) => {
   const raw = await readSmallBody(c.req.raw);
-  if (!c.env.CALENDLY_WEBHOOK_SECRET || !(await verifyCalendlySignature(raw, c.req.header("calendly-webhook-signature") ?? "", c.env.CALENDLY_WEBHOOK_SECRET))) return c.json({ error: "invalid signature" }, 401);
+  if (!c.env.CALENDLY_WEBHOOK_SECRET || !(await verifyCalendlySignature(
+    raw,
+    c.req.header("calendly-webhook-signature") || "",
+    c.env.CALENDLY_WEBHOOK_SECRET,
+  ))) return c.json({ error: "invalid signature" }, 401);
+
   const event = JSON.parse(raw) as Record<string, unknown>;
   const eventName = stringValue(event.event);
+  if (!eventName.includes("invitee.created")) return c.json({ accepted: true, ignored: true });
   const payload = objectValue(event.payload);
   const invitee = objectValue(payload.invitee);
-  const scheduledEvent = objectValue(payload.scheduled_event);
-  const email = stringValue(invitee.email);
-  const providerId = stringValue(invitee.uri) || await sha256(raw);
-  const lead = email ? await c.env.DB.prepare("SELECT id, first_name, last_name FROM leads WHERE lower(email) = lower(?)").bind(email).first<{ id: string; first_name: string; last_name: string }>() : null;
-  const bookingStatus = eventName.includes("canceled") ? "cancelled" : "active";
-  if (lead) {
-    await c.env.DB.batch([
-      c.env.DB.prepare("INSERT OR REPLACE INTO bookings (id, lead_id, provider, provider_event_id, event_name, starts_at, status, metadata_json) VALUES (?, ?, 'calendly', ?, ?, ?, ?, ?)")
-        .bind(uuid(), lead.id, providerId, stringValue(scheduledEvent.name) || "Retirement review", stringValue(scheduledEvent.start_time) || nowIso(), bookingStatus, JSON.stringify({ event: eventName })),
-      c.env.DB.prepare("UPDATE leads SET status = ?, updated_at = ? WHERE id = ?").bind(bookingStatus === "active" ? "booked" : "replied", nowIso(), lead.id),
-    ]);
-    if (bookingStatus === "active") await stopEnrollments(c.env.DB, lead.id, "booked");
-    await writeActivity(c.env.DB, { actorType: "system", actorName: "Calendly", action: bookingStatus === "active" ? "booking.created" : "booking.cancelled", entityType: "lead", entityId: lead.id, detail: `${lead.first_name} ${lead.last_name} ${bookingStatus === "active" ? "booked a retirement-readiness review" : "cancelled a booking"}.`, severity: bookingStatus === "active" ? "success" : "warning" });
-  }
-  return c.json({ accepted: true, matched: Boolean(lead) });
+  const email = extractEmail(stringValue(invitee.email));
+  const result = await ingestEvent(c.env, {
+    provider: "calendly",
+    providerEventId: stringValue(invitee.uri || payload.uri) || await sha256(raw),
+    providerMessageId: "",
+    eventType: "booking",
+    occurredAt: stringValue(payload.created_at || invitee.created_at) || nowIso(),
+    replyEmail: email,
+    raw,
+  });
+  return c.json({ accepted: true, ...result });
 });
 
+type InboundEvent = {
+  provider: string;
+  providerEventId: string;
+  providerMessageId: string;
+  eventType: string;
+  occurredAt: string;
+  replyEmail: string | null;
+  raw: string;
+};
+
+async function ingestEvent(env: Env, input: InboundEvent): Promise<{ duplicate: boolean; matched: boolean }> {
+  const payloadKey = `webhooks/${input.provider}/${new Date().toISOString().slice(0, 10)}/${input.providerEventId.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 180)}.json`;
+  await env.EVIDENCE.put(payloadKey, input.raw, { httpMetadata: { contentType: "application/json" } });
+
+  return neonTransaction(env, async (client) => {
+    const lead = input.replyEmail
+      ? await client.query<{ id: string; email: string; teacher_profile_id: string }>(
+          `SELECT id,email,teacher_profile_id FROM qualified_leads WHERE lower(email)=lower($1) LIMIT 1 FOR UPDATE`,
+          [input.replyEmail],
+        )
+      : await client.query<{ id: string; email: string; teacher_profile_id: string; message_id: string }>(
+          `SELECT q.id,q.email,q.teacher_profile_id,m.id AS message_id
+           FROM outbound_messages m JOIN qualified_leads q ON q.id=m.qualified_lead_id
+           WHERE m.provider=$1 AND m.provider_message_id=$2 LIMIT 1 FOR UPDATE OF q`,
+          [input.provider, input.providerMessageId],
+        );
+    const row = lead.rows[0];
+    const messageId = row && "message_id" in row ? row.message_id : null;
+    const inserted = await client.query(
+      `INSERT INTO message_events(outbound_message_id,event_type,provider,provider_event_id,occurred_at,payload_r2_key)
+       VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(provider,provider_event_id) DO NOTHING RETURNING id`,
+      [messageId, input.eventType, input.provider, input.providerEventId, input.occurredAt, payloadKey],
+    );
+    if (!inserted.rowCount) return { duplicate: true, matched: Boolean(row) };
+
+    if (messageId) {
+      const deliveryStatus = mapDeliveryStatus(input.eventType);
+      if (deliveryStatus) await client.query(
+        `UPDATE outbound_messages SET delivery_status=$2,sent_at=CASE WHEN $2='sent' THEN COALESCE(sent_at,$3::timestamptz) ELSE sent_at END WHERE id=$1`,
+        [messageId, deliveryStatus, input.occurredAt],
+      );
+    }
+
+    if (!row || !TERMINAL_EVENTS.has(input.eventType)) return { duplicate: false, matched: Boolean(row) };
+    await client.query(
+      `UPDATE sequence_enrollments SET status='stopped',stop_reason=$2,completed_at=now(),next_send_at=NULL
+       WHERE qualified_lead_id=$1 AND status='active'`,
+      [row.id, input.eventType],
+    );
+    await client.query(
+      `UPDATE outbound_messages SET delivery_status='cancelled'
+       WHERE qualified_lead_id=$1 AND delivery_status='scheduled'`,
+      [row.id],
+    );
+    await client.query(
+      `UPDATE qualified_leads SET outreach_status=$2 WHERE id=$1`,
+      [row.id, input.eventType === "booking" ? "booked" : input.eventType.includes("reply") ? "replied" : "suppressed"],
+    );
+    if (SUPPRESSION_EVENTS.has(input.eventType)) await client.query(
+      `INSERT INTO suppressions(email,teacher_profile_id,reason,source,scope)
+       SELECT $1,$2,$3,$4,'global' WHERE NOT EXISTS(
+         SELECT 1 FROM suppressions WHERE lower(email)=lower($1) AND scope='global' AND (expires_at IS NULL OR expires_at>now())
+       )`,
+      [row.email, row.teacher_profile_id, input.eventType, input.provider],
+    );
+    await client.query(
+      `INSERT INTO audit_log(entity_type,entity_id,action,rule_version,metadata)
+       VALUES('qualified_lead',$1,'sequence.stopped_terminal_event','signal-os-v2',$2::jsonb)`,
+      [row.id, JSON.stringify({ eventType: input.eventType, provider: input.provider, providerEventId: input.providerEventId })],
+    );
+    return { duplicate: false, matched: true };
+  });
+}
+
 async function readSmallBody(request: Request): Promise<string> {
-  const length = Number(request.headers.get("content-length") ?? 0);
+  const length = Number(request.headers.get("content-length") || 0);
   if (length > 2_000_000) throw new Error("Webhook payload too large.");
-  return request.text();
-}
-
-async function verifySendGridSignature(headers: Headers, body: string, publicKeyValue: string): Promise<boolean> {
-  try {
-    const signature = headers.get("x-twilio-email-event-webhook-signature");
-    const timestamp = headers.get("x-twilio-email-event-webhook-timestamp");
-    if (!signature || !timestamp) return false;
-    const keyBytes = decodePemOrBase64(publicKeyValue);
-    const key = await crypto.subtle.importKey("spki", keyBytes, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
-    return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, decodeBase64(signature), new TextEncoder().encode(timestamp + body));
-  } catch { return false; }
-}
-
-async function verifyTwilioSignature(url: string, body: string, signature: string, token: string): Promise<boolean> {
-  const params = new URLSearchParams(body);
-  let data = url;
-  for (const key of [...new Set([...params.keys()])].sort()) for (const value of params.getAll(key).sort()) data += key + value;
-  const cryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-  const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data)))));
-  return constantTimeEqual(signature, expected);
-}
-
-async function verifyCalendlySignature(body: string, signatureHeader: string, secret: string): Promise<boolean> {
-  const parts = Object.fromEntries(signatureHeader.split(",").map((part) => part.split("=", 2) as [string, string]));
-  if (!parts.t || !parts.v1) return false;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const actual = [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${parts.t}.${body}`)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return constantTimeEqual(parts.v1, actual);
-}
-
-function decodePemOrBase64(value: string): ArrayBuffer {
-  const clean = value.replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g, "");
-  return decodeBase64(clean);
-}
-
-function decodeBase64(value: string): ArrayBuffer {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes.buffer;
-}
-
-function extractEmail(value: string): string | null {
-  return value.match(/<([^>]+)>/)?.[1]?.toLowerCase() ?? value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() ?? null;
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > 2_000_000) throw new Error("Webhook payload too large.");
+  return body;
 }
 
 export function verifyAgentMailEvent(headers: Headers, body: string, secret?: string): Record<string, unknown> | null {
   if (!secret) return null;
   try {
-    const webhook = new Webhook(secret);
-    const verified = webhook.verify(body, {
-      "svix-id": headers.get("svix-id") ?? "",
-      "svix-timestamp": headers.get("svix-timestamp") ?? "",
-      "svix-signature": headers.get("svix-signature") ?? "",
+    const verified = new Webhook(secret).verify(body, {
+      "svix-id": headers.get("svix-id") || "",
+      "svix-timestamp": headers.get("svix-timestamp") || "",
+      "svix-signature": headers.get("svix-signature") || "",
     });
     return objectValue(verified);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
+async function verifyCalendlySignature(body: string, signatureHeader: string, secret: string): Promise<boolean> {
+  const parts = Object.fromEntries(signatureHeader.split(",").map((part) => part.trim().split("=", 2) as [string, string]));
+  if (!parts.t || !parts.v1 || !freshTimestamp(parts.t)) return false;
+  return verifyHexHmac(`${parts.t}.${body}`, parts.v1, secret);
+}
+
+async function verifyTimestampedHmac(body: string, signature: string, timestamp: string, secret: string): Promise<boolean> {
+  const normalized = signature.replace(/^sha256=/, "");
+  if (!normalized || !timestamp || !freshTimestamp(timestamp)) return false;
+  return verifyHexHmac(`${timestamp}.${body}`, normalized, secret);
+}
+
+async function verifyHexHmac(value: string, signature: string, secret: string): Promise<boolean> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return constantTimeEqual(signature.toLowerCase(), digest);
+}
+
+function freshTimestamp(value: string): boolean {
+  const numeric = Number(value);
+  const milliseconds = numeric > 10_000_000_000 ? numeric : numeric * 1_000;
+  return Number.isFinite(milliseconds) && Math.abs(Date.now() - milliseconds) <= 5 * 60 * 1_000;
+}
+
+function mapAgentMailEvent(value: string): string | null {
+  if (value === "message.received") return "reply";
+  return mapDeliveryEvent(value);
+}
+
+function mapDeliveryEvent(value: string): string | null {
+  const normalized = value.toLowerCase().replace(/^message[._]/, "");
+  if (["sent", "delivered"].includes(normalized)) return normalized;
+  if (["bounce", "bounced", "hard_bounce"].includes(normalized)) return "hard_bounce";
+  if (["complaint", "complained", "spam", "spam_report"].includes(normalized)) return "complaint";
+  if (["reject", "rejected", "dropped"].includes(normalized)) return "rejected";
+  if (["unsubscribe", "unsubscribed"].includes(normalized)) return "unsubscribe";
+  if (["reply", "replied", "received"].includes(normalized)) return "reply";
+  return null;
+}
+
+function mapDeliveryStatus(eventType: string): string | null {
+  if (["sent", "delivered"].includes(eventType)) return eventType;
+  if (eventType === "hard_bounce") return "bounced";
+  if (eventType === "complaint") return "complaint";
+  if (eventType === "rejected") return "rejected";
+  return null;
+}
+
+function extractEmail(value: string): string | null {
+  return value.match(/<([^>]+)>/)?.[1]?.toLowerCase() || value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() || null;
+}
 function stringValue(value: unknown): string { return typeof value === "string" ? value : ""; }
 function objectValue(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
-function mapSendGridEvent(value: string): string { return value === "spamreport" ? "spam_complaint" : value; }
-function redactEvent(event: Record<string, unknown>): Record<string, unknown> { return { event: event.event, category: event.category, response: event.response, reason: event.reason, attempt: event.attempt }; }

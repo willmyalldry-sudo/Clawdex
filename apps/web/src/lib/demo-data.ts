@@ -24,20 +24,18 @@ export const demoSignals: Signal[] = [
 ];
 
 export const demoCampaigns: Campaign[] = [
-  { id: "d1", name: "Nevada Educator Retirement Checkup", campaign_type: "sequence", status: "pending_approval", audience_description: "Nevada educators with validated email and evidence-backed scores above 70.", current_version: 1, subject: "A retirement checklist for Nevada educators", preview_text: "Three topics to review before your next benefits meeting.", enrollment_count: 0, sent_count: 0, compliance_result_json: '{"passed":true,"blockers":[],"warnings":[]}', updated_at: new Date(Date.now() - 2 * 36e5).toISOString() },
+  { id: "d1", name: "Nevada Educator Signal Sequence", campaign_type: "signal_sequence", status: "active", audience_description: "Nevada educators with verified public retirement signals and valid employer email.", current_version: 1, subject: "A retirement checklist for you", preview_text: "Signal-specific educational follow-up.", enrollment_count: 91, sent_count: 126, compliance_result_json: '{"passed":true,"blockers":[],"warnings":[]}', updated_at: new Date(Date.now() - 2 * 36e5).toISOString() },
   { id: "d2", name: "Monthly PERS & 403(b) Brief", campaign_type: "newsletter", status: "draft", audience_description: "Contacts with active email newsletter consent.", current_version: 1, subject: "Nevada educator retirement brief", preview_text: "A monthly educational summary.", enrollment_count: 66, sent_count: 63, compliance_result_json: '{"passed":true,"blockers":[],"warnings":["Consent audience must be selected."]}', updated_at: new Date(Date.now() - 4 * 36e5).toISOString() },
   { id: "d3", name: "Benefits Transition Follow-up", campaign_type: "sequence", status: "approved", audience_description: "Educators with a cited public role-change signal.", current_version: 2, subject: "Organizing questions after a benefits change", preview_text: "A short educational checklist.", enrollment_count: 25, sent_count: 21, compliance_result_json: '{"passed":true,"blockers":[],"warnings":[]}', updated_at: new Date(Date.now() - 2 * 864e5).toISOString() },
 ];
 
-export const demoApprovals: Approval[] = [
-  { campaign_id: "d1", name: "Nevada Educator Retirement Checkup", campaign_type: "sequence", audience_description: "Nevada educators with validated email and an evidence-backed score above 70.", current_version: 1, subject: "A retirement checklist for Nevada educators", preview_text: "Three topics to review before your next benefits meeting.", body_html: "<p>Hi {{first_name}},</p><p>I work with Nevada educators who want to organize their questions around PERS, 403(b) accounts, and retirement transitions.</p><p>If a short educational retirement-readiness review would be useful, you can choose a time here: {{booking_link}}</p><p>{{unsubscribe_link}}</p>", disclosure: "Educational information only. This communication is not individualized investment, tax, or legal advice.", compliance_result_json: '{"passed":true,"blockers":[],"warnings":[]}', created_at: new Date(Date.now() - 2 * 36e5).toISOString() },
-];
+export const demoApprovals: Approval[] = [];
 
 export const demoActivity: Activity[] = [
-  { id: "f1", actor_type: "agent", actor_name: "TinyFish Source Scout", action: "sources.discovered", detail: "Found 8 public source candidates; each requires human approval.", severity: "success", occurred_at: new Date(Date.now() - 8 * 60e3).toISOString() },
+  { id: "f1", actor_type: "agent", actor_name: "Source Policy", action: "sources.evaluated", detail: "Allowed official public sources and quarantined 8 policy failures automatically.", severity: "success", occurred_at: new Date(Date.now() - 8 * 60e3).toISOString() },
   { id: "f2", actor_type: "agent", actor_name: "Signal Analyst", action: "signal.discovered", detail: "Detected a Nevada retirement resource update.", severity: "success", occurred_at: new Date(Date.now() - 18 * 60e3).toISOString() },
   { id: "f3", actor_type: "agent", actor_name: "Email Validator", action: "lead.validated", detail: "Validated Maria Santos' professional email.", severity: "success", occurred_at: new Date(Date.now() - 36 * 60e3).toISOString() },
-  { id: "f4", actor_type: "user", actor_name: "Benjamin Persyn", action: "campaign.submitted", detail: "Submitted Nevada Educator Retirement Checkup for approval.", severity: "info", occurred_at: new Date(Date.now() - 2 * 36e5).toISOString() },
+  { id: "f4", actor_type: "system", actor_name: "Sequence Agent", action: "lead.enrolled", detail: "Enrolled an eligible signal-backed lead in the Day 1–7 workflow.", severity: "info", occurred_at: new Date(Date.now() - 2 * 36e5).toISOString() },
   { id: "f5", actor_type: "system", actor_name: "Compliance Guard", action: "campaign.blocked", detail: "Newsletter remains in draft until a consented audience is selected.", severity: "warning", occurred_at: new Date(Date.now() - 4 * 36e5).toISOString() },
 ];
 

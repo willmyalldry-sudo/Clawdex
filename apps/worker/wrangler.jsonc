@@ -9,21 +9,12 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/webhooks/*", "/unsubscribe", "/book", "/crawler-policy"]
+    "run_worker_first": ["/api/*", "/agents/*", "/webhooks/*", "/unsubscribe", "/book", "/crawler-policy"]
   },
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "head_sampling_rate": 1 },
     "traces": { "enabled": true, "head_sampling_rate": 0.1 }
-  },
-  "secrets": {
-    "required": [
-      "TINYFISH_API_KEY",
-      "APOLLO_API_KEY",
-      "AGENTMAIL_API_KEY",
-      "AGENTMAIL_WEBHOOK_SECRET",
-      "UNSUBSCRIBE_SECRET"
-    ]
   },
   "vars": {
     "APP_NAME": "Benjamin Persyn Agent OS",
@@ -48,12 +39,6 @@
     "ENRICHMENT_PROVIDER_MODE": "apollo_first",
     "AGENTMAIL_API_BASE": "https://api.agentmail.to/v0",
     "AGENTMAIL_INBOX_ID": "nevadaeducators@agentmail.to",
-    "AGENTMAIL_SMTP_HOST": "smtp.agentmail.to",
-    "AGENTMAIL_SMTP_PORT": "465",
-    "AGENTMAIL_SMTP_SECURITY": "implicit_tls",
-    "AGENTMAIL_IMAP_HOST": "imap.agentmail.to",
-    "AGENTMAIL_IMAP_PORT": "993",
-    "AGENTMAIL_IMAP_SECURITY": "tls",
     "AUTOSEND_API_BASE": "https://api.autosend.com/v1",
     "AUTOSEND_PROJECT_ID": "69f221ce39db849a50f16a8b",
     "AUTOSEND_PROJECT_SLUG": "teachers-retirement",
@@ -61,18 +46,27 @@
     "AUTOSEND_DEFAULT_FROM_EMAIL": "benjamin@afinancial.org",
     "AUTOSEND_SECONDARY_FROM_EMAIL": "benjamin@aureviaretirement.com",
     "AUTOSEND_REPLY_TO_EMAIL": "services@afinancialpartner.com",
-    "AUTOSEND_MCP_URL": "https://mcp.autosend.com/",
-    "AUTOSEND_BACKUP_PROJECT_ID": "6a1351681bdbd06a4a4065b3",
-    "AUTOSEND_BACKUP_PROJECT_SLUG": "johnita/brian",
-    "AUTOSEND_BACKUP_FROM_NAME": "Brian Persyn",
-    "AUTOSEND_BACKUP_PRIMARY_EMAIL": "educators@403bclarity.org",
-    "AUTOSEND_BACKUP_SECONDARY_EMAIL": "notification@teachersretirement.info",
-    "EMAIL_PROVIDER_MODE": "agentmail_first",
+    "EMAIL_PROVIDER_MODE": "agentmail_only",
     "SEARCH_PROVIDER_MODE": "multi",
     "CRAWL_PROVIDER_MODE": "parallel_first",
     "FROM_EMAIL": "nevadaeducators@agentmail.to",
     "FROM_NAME": "Benjamin Persyn | Appreciation Financial",
-    "REPLY_TO_EMAIL": "services@afinancialpartner.com"
+    "REPLY_TO_EMAIL": "services@afinancialpartner.com",
+    "SEARCH_CRON": "5 * * * *",
+    "SEARCH_BATCH_SIZE": "8",
+    "MAX_HOURLY_SEARCH_COST": "12",
+    "MAX_DAILY_SEARCH_COST": "150",
+    "MAX_EMAILS_PER_HOUR": "10",
+    "MAX_EMAILS_PER_DAY": "50",
+    "SEND_WINDOW_START": "09:00",
+    "SEND_WINDOW_END": "16:30",
+    "SEND_TIMEZONE": "America/Los_Angeles",
+    "MIN_SIGNAL_SCORE": "60",
+    "MIN_QUALIFICATION_SCORE": "75",
+    "MIN_IDENTITY_CONFIDENCE": "0.80",
+    "MIN_EMPLOYMENT_CONFIDENCE": "0.80",
+    "MAX_SIGNAL_AGE_DAYS": "90",
+    "EMAIL_VALIDATION_MAX_AGE_DAYS": "30"
   },
   "d1_databases": [
     {
@@ -81,6 +75,23 @@
       "database_id": "4e3c9d3e-2c39-4540-949a-67e9ca943800",
       "migrations_dir": "migrations"
     }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "b6c07889cbd046f780088d6db65ffc20"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "MCP_CONTROL_AGENT", "class_name": "McpControlAgent" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1-mcp-control-agent", "new_sqlite_classes": ["McpControlAgent"] }
   ],
   "r2_buckets": [
     {
@@ -118,6 +129,6 @@
     }
   ],
   "triggers": {
-    "crons": ["17 14 * * 1-5"]
+    "crons": ["5 * * * *"]
   }
 }

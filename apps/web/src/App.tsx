@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Layout } from "./components/Layout";
 import { Toast } from "./components/ui";
 import { AnalyticsPage, ApprovalsPage, CampaignsPage, DashboardPage, LeadsPage, SettingsPage, SignalsPage, SourcesPage } from "./components/pages";
+import { McpAgentPage } from "./components/McpAgentPage";
 import { getJson, isDemo, mutateJson } from "./lib/api";
 import { demoActivity, demoApprovals, demoCampaigns, demoDashboard, demoLeads, demoSignals, demoSources } from "./lib/demo-data";
 import type { Activity, Approval, Campaign, DashboardData, Lead, PageId, Signal, Source } from "./lib/types";
 
-const validPages: PageId[] = ["dashboard", "leads", "signals", "campaigns", "approvals", "analytics", "sources", "settings"];
+const validPages: PageId[] = ["dashboard", "leads", "signals", "campaigns", "approvals", "analytics", "sources", "mcp", "settings"];
 
 export function App() {
   const [page, setPage] = useState<PageId>(() => pageFromHash());
@@ -21,7 +22,7 @@ export function App() {
   const [approvals, setApprovals] = useState<Approval[]>(demoApprovals);
   const [activity, setActivity] = useState<Activity[]>(demoActivity);
   const [sources, setSources] = useState<Source[]>(demoSources);
-  const [providerStatus, setProviderStatus] = useState({ tinyfish: isDemo, parallel: isDemo, apollo: isDemo, peopleDataLabs: false, agentmail: isDemo, autosend: false, sendgrid: false });
+  const [providerStatus, setProviderStatus] = useState({ tinyfish: isDemo, parallel: isDemo, apollo: isDemo, peopleDataLabs: false, zerobounce: isDemo, agentmail: isDemo, autosend: false });
 
   const navigate = useCallback((nextPage: PageId) => {
     setPage(nextPage);
@@ -50,7 +51,8 @@ export function App() {
           getJson("/api/health", {
             researchProviders: { tinyfish: isDemo, parallel: isDemo },
             enrichmentProviders: { apollo: isDemo, peopleDataLabs: false },
-            emailProviders: { agentmail: isDemo, autosend: false, sendgrid: false },
+            validationProviders: { zerobounce: isDemo },
+            emailProviders: { agentmail: isDemo, autosend: false },
           }),
         ]);
         if (!cancelled) {
@@ -62,9 +64,9 @@ export function App() {
             parallel: Boolean(healthResponse.researchProviders?.parallel),
             apollo: Boolean(healthResponse.enrichmentProviders?.apollo),
             peopleDataLabs: Boolean(healthResponse.enrichmentProviders?.peopleDataLabs),
+            zerobounce: Boolean(healthResponse.validationProviders?.zerobounce),
             agentmail: Boolean(healthResponse.emailProviders?.agentmail),
             autosend: Boolean(healthResponse.emailProviders?.autosend),
-            sendgrid: Boolean(healthResponse.emailProviders?.sendgrid),
           });
         }
       } catch (error) {
@@ -98,6 +100,7 @@ export function App() {
     {page === "approvals" && <ApprovalsPage approvals={approvals} onAction={performAction} />}
     {page === "analytics" && <AnalyticsPage dashboard={dashboard} campaigns={campaigns} />}
     {page === "sources" && <SourcesPage sources={sources} activity={activity} onAction={performAction} />}
+    {page === "mcp" && <McpAgentPage />}
     {page === "settings" && <SettingsPage providerStatus={providerStatus} />}
     {toast && <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />}
   </Layout>;

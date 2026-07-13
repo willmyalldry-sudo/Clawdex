@@ -1,0 +1,25 @@
+{
+  "name": "maigret",
+  "repository": "https://github.com/soxoj/maigret",
+  "commit": "de7875d236ef457a2af9b66b3239b8902dd006cc",
+  "mode": "disabled",
+  "runtimeDependency": false,
+  "approvedPurpose": "Optional corroboration of an already-public professional profile URL for an already-verified educator.",
+  "forbiddenCapabilities": [
+    "personal or non-professional account discovery",
+    "private, authenticated, paywalled, or member-only access",
+    "CAPTCHA bypass",
+    "Tor or proxy evasion",
+    "recursive personal OSINT",
+    "email guessing or validation",
+    "lead qualification without independent employer evidence",
+    "automatic outreach eligibility"
+  ],
+  "activationRequirements": [
+    "written campaign policy approval",
+    "isolated service with strict allowlist",
+    "public professional URL input only",
+    "audited output filtering",
+    "no personal data retention"
+  ]
+}

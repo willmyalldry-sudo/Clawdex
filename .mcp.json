@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "pipedream-abstract-email-validation": {
+      "type": "http",
+      "url": "https://mcp.pipedream.com/app/abstract"
+    },
+    "pipedream-bouncer-email-validation": {
+      "type": "http",
+      "url": "https://mcp.pipedream.com/app/bouncer"
+    },
+    "meilisearch": {
+      "command": "uvx",
+      "args": ["-n", "meilisearch-mcp"]
+    },
+    "opensearch": {
+      "command": "uvx",
+      "args": ["opensearch-mcp-server-py"]
+    }
+  }
+}
