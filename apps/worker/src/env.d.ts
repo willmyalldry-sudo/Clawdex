@@ -12,7 +12,7 @@ interface Env {
   AUTOSEND_BRIAN_API_KEY?: string;
   AUTOSEND_WEBHOOK_SECRET?: string;
   PDL_API_KEY?: string;
-  ZEROBOUNCE_API_KEY?: string;
+  BOUNCER_API_KEY?: string;
   SENDGRID_API_KEY?: string;
   SENDGRID_WEBHOOK_PUBLIC_KEY?: string;
   INBOUND_WEBHOOK_TOKEN?: string;

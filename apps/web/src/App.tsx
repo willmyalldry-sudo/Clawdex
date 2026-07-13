@@ -22,7 +22,7 @@ export function App() {
   const [approvals, setApprovals] = useState<Approval[]>(demoApprovals);
   const [activity, setActivity] = useState<Activity[]>(demoActivity);
   const [sources, setSources] = useState<Source[]>(demoSources);
-  const [providerStatus, setProviderStatus] = useState({ tinyfish: isDemo, parallel: isDemo, apollo: isDemo, peopleDataLabs: false, zerobounce: isDemo, agentmail: isDemo, autosend: false });
+  const [providerStatus, setProviderStatus] = useState({ tinyfish: isDemo, parallel: isDemo, apollo: isDemo, peopleDataLabs: false, bouncer: isDemo, agentmail: isDemo, autosend: false });
 
   const navigate = useCallback((nextPage: PageId) => {
     setPage(nextPage);
@@ -51,7 +51,7 @@ export function App() {
           getJson("/api/health", {
             researchProviders: { tinyfish: isDemo, parallel: isDemo },
             enrichmentProviders: { apollo: isDemo, peopleDataLabs: false },
-            validationProviders: { zerobounce: isDemo },
+            validationProviders: { bouncer: isDemo },
             emailProviders: { agentmail: isDemo, autosend: false },
           }),
         ]);
@@ -64,7 +64,7 @@ export function App() {
             parallel: Boolean(healthResponse.researchProviders?.parallel),
             apollo: Boolean(healthResponse.enrichmentProviders?.apollo),
             peopleDataLabs: Boolean(healthResponse.enrichmentProviders?.peopleDataLabs),
-            zerobounce: Boolean(healthResponse.validationProviders?.zerobounce),
+            bouncer: Boolean(healthResponse.validationProviders?.bouncer),
             agentmail: Boolean(healthResponse.emailProviders?.agentmail),
             autosend: Boolean(healthResponse.emailProviders?.autosend),
           });

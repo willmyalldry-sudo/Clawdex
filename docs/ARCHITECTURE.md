@@ -20,7 +20,7 @@ Cron 5 * * * *
       -> evidence-backed signal
       -> educator candidate/profile/link
       -> Apollo -> optional PDL
-      -> ZeroBounce + employer-domain validation
+      -> Bouncer + employer-domain validation
       -> deterministic qualification
       -> enrollment and signal-specific preflight
       -> AgentMail / controlled AutoSend
@@ -42,7 +42,7 @@ Cron 5 * * * *
 
 1. A qualified lead references one current verified signal.
 2. A signal retains its source URL, evidence excerpt, content hash, and R2 artifact.
-3. A professional email must match the verified employer domain and have a current `valid` ZeroBounce record.
+3. A professional email must match the verified employer domain and have a current `valid` Bouncer record.
 4. A terminal event cancels scheduled messages before another step can send.
 5. Newsletter subscription requires explicit timestamped consent evidence.
 6. Provider fallback is allowed only before the primary provider accepted the message.

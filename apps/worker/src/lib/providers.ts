@@ -211,16 +211,16 @@ export async function validateLeadEmail(env: Env, leadId: string, runId: string)
     await finishProviderRun(env, runId, "completed", { status: "unavailable" });
     return;
   }
-  if (!env.ZEROBOUNCE_API_KEY) {
-    await finishProviderRun(env, runId, "skipped", { reason: "ZEROBOUNCE_API_KEY is not configured" });
+  if (!env.BOUNCER_API_KEY) {
+    await finishProviderRun(env, runId, "skipped", { reason: "BOUNCER_API_KEY is not configured" });
     return;
   }
-  const params = new URLSearchParams({ api_key: env.ZEROBOUNCE_API_KEY, email: lead.email });
-  const response = await fetch(`${env.ZEROBOUNCE_API_BASE}/validate?${params}`, { signal: AbortSignal.timeout(15_000) });
-  if (!response.ok) throw new Error(`ZeroBounce returned HTTP ${response.status}.`);
+  const params = new URLSearchParams({ email: lead.email });
+  const response = await fetch(`${env.BOUNCER_API_BASE}/email/verify?${params}`, { headers: { "x-api-key": env.BOUNCER_API_KEY }, signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(`Bouncer returned HTTP ${response.status}.`);
   const data = await response.json<Record<string, unknown>>();
   const providerStatus = typeof data.status === "string" ? data.status.toLowerCase() : "unknown";
-  const status = providerStatus === "valid" ? "valid" : providerStatus === "invalid" ? "invalid" : providerStatus === "unknown" ? "unavailable" : "risky";
+  const status = providerStatus === "deliverable" ? "valid" : providerStatus === "undeliverable" ? "invalid" : providerStatus === "unknown" ? "unavailable" : "risky";
   await env.DB.prepare("UPDATE leads SET email_status = ?, status = CASE WHEN ? = 'valid' THEN 'ready' ELSE status END, updated_at = ? WHERE id = ?")
     .bind(status, status, nowIso(), leadId).run();
   await finishProviderRun(env, runId, "completed", { providerStatus, status });

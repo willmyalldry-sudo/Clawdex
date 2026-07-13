@@ -70,7 +70,7 @@ Recommended Worker-to-Neon connection:
 - Bounded native HTTP fallback
 - Apollo People Enrichment as primary enrichment
 - People Data Labs as optional fallback
-- ZeroBounce as primary email validator
+- Bouncer as primary email validator
 - AgentMail as default sending and reply-management provider
 - AutoSend as optional sending provider or controlled fallback
 - Calendly webhook integration for booking stops
@@ -114,7 +114,7 @@ Use People Data Labs only when configured and needed
         ↓
 Validate employer domain and professional email
         ↓
-ZeroBounce validation and hygiene checks
+Bouncer validation and hygiene checks
         ↓
 Apply suppression, duplicate and recency checks
         ↓
@@ -863,7 +863,7 @@ People Data Labs may run only when:
 
 # Email validation and cleaning
 
-ZeroBounce is the primary validator.
+Bouncer is the primary validator.
 
 The validation pipeline must:
 
@@ -1233,7 +1233,7 @@ DATABASE_URL
 PARALLEL_API_KEY
 TINYFISH_API_KEY
 APOLLO_API_KEY
-ZEROBOUNCE_API_KEY
+BOUNCER_API_KEY
 AGENTMAIL_API_KEY
 AGENTMAIL_WEBHOOK_SECRET
 UNSUBSCRIBE_SECRET
@@ -1344,7 +1344,7 @@ npx wrangler secret put DATABASE_URL --config apps/worker/wrangler.jsonc
 npx wrangler secret put PARALLEL_API_KEY --config apps/worker/wrangler.jsonc
 npx wrangler secret put TINYFISH_API_KEY --config apps/worker/wrangler.jsonc
 npx wrangler secret put APOLLO_API_KEY --config apps/worker/wrangler.jsonc
-npx wrangler secret put ZEROBOUNCE_API_KEY --config apps/worker/wrangler.jsonc
+npx wrangler secret put BOUNCER_API_KEY --config apps/worker/wrangler.jsonc
 npx wrangler secret put AGENTMAIL_API_KEY --config apps/worker/wrangler.jsonc
 npx wrangler secret put AGENTMAIL_WEBHOOK_SECRET --config apps/worker/wrangler.jsonc
 npx wrangler secret put AUTOSEND_API_KEY --config apps/worker/wrangler.jsonc
@@ -1407,7 +1407,7 @@ npm run deploy
 - Apollo receives only approved professional inputs.
 - Personal reveal fields remain disabled.
 - Employer-domain matching works.
-- ZeroBounce statuses map correctly.
+- Bouncer statuses map correctly.
 - Invalid, risky, catch-all, role, free, and suppressed addresses are blocked.
 - Validation-expiry rules work.
 

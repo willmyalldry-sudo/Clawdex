@@ -94,39 +94,39 @@ async function validateEmail(env: Env, job: Extract<LeadJob, { kind: "validate-e
     await audit(env, "teacher_profile", job.teacherProfileId, "email.blocked_local_gate", { reasons: localGate.reasons });
     return;
   }
-  if (!env.ZEROBOUNCE_API_KEY) {
+  if (!env.BOUNCER_API_KEY) {
     await audit(env, "teacher_profile", job.teacherProfileId, "email.blocked_validator_missing", {});
     return;
   }
-  const params = new URLSearchParams({ api_key: env.ZEROBOUNCE_API_KEY, email: job.email });
+  const params = new URLSearchParams({ email: job.email });
   const started = Date.now();
-  const response = await fetch(`${env.ZEROBOUNCE_API_BASE}/validate?${params}`, { signal: AbortSignal.timeout(20_000) });
-  if (!response.ok) throw new Error(`ZeroBounce returned HTTP ${response.status}.`);
+  const response = await fetch(`${env.BOUNCER_API_BASE}/email/verify?${params}`, { headers: { "x-api-key": env.BOUNCER_API_KEY }, signal: AbortSignal.timeout(20_000) });
+  if (!response.ok) throw new Error(`Bouncer returned HTTP ${response.status}.`);
   const data = await response.json<Record<string, unknown>>();
   const status = stringValue(data.status).toLowerCase() || "unknown";
-  const subStatus = stringValue(data.sub_status).toLowerCase();
-  const account = job.email.split("@")[0]!.toLowerCase();
-  const isRole = /^(?:admin|benefits|contact|hello|hr|info|office|support|team|webmaster)$/.test(account) || /role/.test(subStatus);
-  const isCatchAll = /catch.?all/.test(subStatus);
-  const isDisposable = /disposable/.test(subStatus);
-  const isFree = /free.?email/.test(subStatus);
-  const clean = status === "valid" && !isRole && !isCatchAll && !isDisposable && !isFree;
+  const domain = (data.domain ?? {}) as Record<string, unknown>;
+  const account = (data.account ?? {}) as Record<string, unknown>;
+  const isRole = stringValue(account.role).toLowerCase() === "yes";
+  const isCatchAll = stringValue(domain.acceptAll).toLowerCase() === "yes";
+  const isDisposable = stringValue(domain.disposable).toLowerCase() === "yes";
+  const isFree = stringValue(domain.free).toLowerCase() === "yes";
+  const clean = status === "deliverable" && !isRole && !isCatchAll && !isDisposable && !isFree;
   await neonQuery(env,
     `INSERT INTO email_validations (
-       teacher_profile_id,email,domain,validation_status,smtp_status,is_disposable,is_role_address,is_free_provider,is_catch_all,
+       teacher_profile_id,email,domain,provider,validation_status,smtp_status,is_disposable,is_role_address,is_free_provider,is_catch_all,
        is_employer_domain_match,risk_score,provider_metadata,expires_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11,now() + make_interval(days => $12))`,
-    [job.teacherProfileId, job.email.toLowerCase(), employerDomain, clean ? "valid" : status, subStatus || null,
+     ) VALUES ($1,$2,$3,'bouncer',$4,$5,$6,$7,$8,$9,true,$10,$11,now() + make_interval(days => $12))`,
+    [job.teacherProfileId, job.email.toLowerCase(), employerDomain, clean ? "valid" : status, stringValue(data.reason) || null,
       isDisposable, isRole, isFree, isCatchAll, clean ? 0 : 100, JSON.stringify(redactValidation(data)), configNumber(env.EMAIL_VALIDATION_MAX_AGE_DAYS, 30)],
   );
   await neonQuery(env,
-    `INSERT INTO provider_usage (provider, operation, result_count, latency_ms, status) VALUES ('zerobounce','email_validation',1,$1,'completed')`,
+    `INSERT INTO provider_usage (provider, operation, result_count, latency_ms, status) VALUES ('bouncer','email_validation',1,$1,'completed')`,
     [Date.now() - started],
   );
   if (clean) {
     await env.AGENT_QUEUE.send({ kind: "qualify-lead", teacherProfileId: job.teacherProfileId, signalEventId: job.signalEventId, idempotencyKey: `qualify:${job.teacherProfileId}:${job.signalEventId}` }, { contentType: "json" });
   } else {
-    await audit(env, "teacher_profile", job.teacherProfileId, "email.validation_rejected", { status, subStatus });
+    await audit(env, "teacher_profile", job.teacherProfileId, "email.validation_rejected", { status, reason: stringValue(data.reason) });
   }
 }
 
@@ -244,7 +244,7 @@ async function claim(env: Env, job: LeadJob): Promise<boolean> {
 }
 async function finish(env: Env, key: string, status: string, error?: unknown) { await neonQuery(env, "UPDATE pipeline_jobs SET status=$2,completed_at=now(),error_code=$3,error_message=$4 WHERE idempotency_key=$1", [key, status, error ? "provider_or_database_error" : null, error instanceof Error ? error.message.slice(0, 1_000) : null]); }
 async function audit(env: Env, entityType: string, entityId: string, action: string, metadata: Record<string, unknown>) { await neonQuery(env, "INSERT INTO audit_log (entity_type,entity_id,action,rule_version,metadata) VALUES ($1,$2,$3,'signal-os-v2',$4)", [entityType, entityId, action, JSON.stringify(metadata)]); }
-function redactValidation(data: Record<string, unknown>) { return { status: data.status, sub_status: data.sub_status, mx_found: data.mx_found, did_you_mean: data.did_you_mean ? true : false }; }
+function redactValidation(data: Record<string, unknown>) { return { status: data.status, reason: data.reason, domain: data.domain, account: data.account, score: data.score }; }
 function redactProvider(raw: Record<string, unknown>) { const copy = structuredClone(raw); for (const key of ["phone", "phone_numbers", "personal_emails", "street_address", "address"]) delete copy[key]; return copy; }
 function stringValue(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
 function objectValue(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }

@@ -24,7 +24,7 @@ api.get("/health", async (c) => {
     cron: c.env.SEARCH_CRON,
     researchProviders: { tinyfish: Boolean(c.env.TINYFISH_API_KEY), parallel: Boolean(c.env.PARALLEL_API_KEY) },
     enrichmentProviders: { apollo: Boolean(c.env.APOLLO_API_KEY), peopleDataLabs: Boolean(c.env.PDL_API_KEY) },
-    validationProviders: { zerobounce: Boolean(c.env.ZEROBOUNCE_API_KEY), operatorMcp: ["abstract", "bouncer"] },
+    validationProviders: { bouncer: Boolean(c.env.BOUNCER_API_KEY), operatorMcp: ["abstract"] },
     emailProviders: { agentmail: Boolean(c.env.AGENTMAIL_API_KEY && c.env.AGENTMAIL_INBOX_ID), autosend: Boolean(c.env.AUTOSEND_API_KEY) },
     timestamp: nowIso(),
   }, neon ? 200 : 503);

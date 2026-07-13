@@ -31,7 +31,7 @@
     "SENDGRID_API_BASE": "https://api.sendgrid.com/v3",
     "TWILIO_API_BASE": "https://api.twilio.com/2010-04-01",
     "PDL_API_BASE": "https://api.peopledatalabs.com/v5",
-    "ZEROBOUNCE_API_BASE": "https://api.zerobounce.net/v2",
+    "BOUNCER_API_BASE": "https://api.usebouncer.com/v1.1",
     "TINYFISH_FETCH_API_BASE": "https://api.fetch.tinyfish.ai",
     "TINYFISH_SEARCH_API_BASE": "https://api.search.tinyfish.ai",
     "PARALLEL_API_BASE": "https://api.parallel.ai/v1",

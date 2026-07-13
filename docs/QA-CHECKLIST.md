@@ -28,7 +28,7 @@
 - [x] Current employment and identity confidence required
 - [x] Personal, free, role, guessed, catch-all, and employer-mismatch emails blocked
 - [x] Apollo requests exclude personal reveal fields
-- [x] ZeroBounce `valid` is the only accepted runtime status
+- [x] Bouncer `valid` (deliverable, non-role, non-catch-all, non-disposable, non-free) is the only accepted runtime status
 - [x] Suppression, terminal event, and active enrollment cannot be bypassed
 
 ## Message and sequence
@@ -46,7 +46,7 @@
 ## Production blockers
 
 - [ ] `PARALLEL_API_KEY`
-- [ ] `ZEROBOUNCE_API_KEY`
+- [ ] `BOUNCER_API_KEY`
 - [ ] Optional PDL/AutoSend/Calendly credentials if enabled
 - [ ] SPF, DKIM, DMARC and sender identity verification
 - [ ] Imported global suppression lists

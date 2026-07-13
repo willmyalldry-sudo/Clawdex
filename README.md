@@ -27,7 +27,7 @@ Hourly Cron
   -> extract and deduplicate retirement signals
   -> resolve current public educator identity
   -> Apollo enrichment, optional PDL fallback
-  -> ZeroBounce validation and employer-domain gate
+  -> Bouncer validation and employer-domain gate
   -> deterministic qualification
   -> Day 1, 3, 5, 7 Workflow enrollment
   -> deterministic message preflight
@@ -54,7 +54,7 @@ There is no routine human approval queue. Unsafe or incomplete records are block
 - Neon Postgres + `pg` + Cloudflare Hyperdrive
 - Cloudflare Cron, Queues, Workflows, R2, Access, Workers AI, Durable Objects
 - Zod contracts across API, queues, workflows, and qualification logic
-- Parallel, TinyFish, Apollo, optional People Data Labs, ZeroBounce, AgentMail, optional AutoSend, Calendly
+- Parallel, TinyFish, Apollo, optional People Data Labs, Bouncer, AgentMail, optional AutoSend, Calendly
 
 D1 remains bound only for legacy/demo control-plane compatibility. Signal, educator, validation, qualification, outreach, sequence, newsletter, suppression, and analytics state is written to Neon.
 
@@ -96,7 +96,7 @@ DATABASE_URL
 PARALLEL_API_KEY
 TINYFISH_API_KEY
 APOLLO_API_KEY
-ZEROBOUNCE_API_KEY
+BOUNCER_API_KEY
 AGENTMAIL_API_KEY
 AGENTMAIL_WEBHOOK_SECRET
 UNSUBSCRIBE_SECRET
@@ -120,7 +120,7 @@ Webhook bodies are bounded, signatures and timestamp freshness are checked, raw 
 
 ## MCP and optional search tools
 
-The root [`.mcp.json`](.mcp.json) configures Pipedream Abstract and Bouncer for optional operator-side email checks, plus Meilisearch and OpenSearch administration tools. They do not replace Neon or override ZeroBounce and employer-domain validation.
+The root [`.mcp.json`](.mcp.json) configures Pipedream Abstract and Bouncer for optional operator-side email checks, plus Meilisearch and OpenSearch administration tools. These are separate, interactive tools; they do not replace Neon and cannot override the production Bouncer REST call or employer-domain validation.
 
 The dashboard also contains an Access-protected MCP Control Agent for explicitly approved general tool execution. See [`docs/MCP-CONTROL-AGENT.md`](docs/MCP-CONTROL-AGENT.md).
 
@@ -152,6 +152,6 @@ Do not change `OUTREACH_MODE` until all are verified:
 - Imported global suppressions and confirmed newsletter-consent workflow.
 - Cloudflare Access on every operational route.
 - Search, enrichment, validation, mailbox, domain, hourly, and daily caps.
-- Required provider secrets, especially Parallel and ZeroBounce.
+- Required provider secrets, especially Parallel and Bouncer.
 
 This software implements technical controls. It is not legal, tax, investment, or regulatory advice.
