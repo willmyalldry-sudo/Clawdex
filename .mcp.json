@@ -15,6 +15,14 @@
     "opensearch": {
       "command": "uvx",
       "args": ["opensearch-mcp-server-py"]
+    },
+    "supermemory": {
+      "type": "http",
+      "url": "https://mcp.supermemory.ai/mcp"
+    },
+    "autosend": {
+      "type": "http",
+      "url": "https://mcp.autosend.com/"
     }
   }
 }

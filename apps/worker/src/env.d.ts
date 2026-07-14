@@ -13,6 +13,7 @@ interface Env {
   AUTOSEND_WEBHOOK_SECRET?: string;
   PDL_API_KEY?: string;
   BOUNCER_API_KEY?: string;
+  CLEAROUT_API_KEY?: string;
   SENDGRID_API_KEY?: string;
   SENDGRID_WEBHOOK_PUBLIC_KEY?: string;
   INBOUND_WEBHOOK_TOKEN?: string;

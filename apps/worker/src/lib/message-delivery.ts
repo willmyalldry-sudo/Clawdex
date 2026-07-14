@@ -5,7 +5,7 @@ type SendJob = Extract<SignalJob, { kind: "send-message" }>;
 
 interface MessageRow {
   id: string; qualified_lead_id: string; email: string; first_name: string; last_name: string; subject: string; body: string;
-  provider: string; preflight_status: string; delivery_status: string; idempotency_key: string;
+  provider: string; preflight_status: string; delivery_status: string; idempotency_key: string; step_number: number;
 }
 
 export async function processSendJob(env: Env, raw: unknown): Promise<void> {
@@ -23,7 +23,7 @@ export async function processSendJob(env: Env, raw: unknown): Promise<void> {
 
 async function sendMessage(env: Env, messageId: string): Promise<void> {
   const rows = await neonQuery<MessageRow>(env,
-    `SELECT om.id,om.qualified_lead_id,ql.email,ql.first_name,ql.last_name,om.subject,om.body,om.provider,om.preflight_status,om.delivery_status,om.idempotency_key
+    `SELECT om.id,om.qualified_lead_id,ql.email,ql.first_name,ql.last_name,om.subject,om.body,om.provider,om.preflight_status,om.delivery_status,om.idempotency_key,om.step_number
      FROM outbound_messages om JOIN qualified_leads ql ON ql.id=om.qualified_lead_id WHERE om.id=$1`, [messageId]);
   const message = rows.rows[0];
   if (!message || message.delivery_status !== "scheduled" || message.preflight_status !== "passed") return;
@@ -40,14 +40,19 @@ async function sendMessage(env: Env, messageId: string): Promise<void> {
     await neonQuery(env, "UPDATE outbound_messages SET delivery_status='blocked',preflight_failures='[\"terminal_recheck_failed\"]'::jsonb WHERE id=$1", [messageId]);
     return;
   }
-  const mode = String(env.EMAIL_PROVIDER_MODE || "agentmail_only");
   let accepted: { provider: string; messageId: string };
-  if (mode === "autosend_only") accepted = await sendAutoSend(env, message);
-  else {
-    try { accepted = await sendAgentMail(env, message); }
-    catch (error) {
-      if (mode !== "agentmail_with_autosend_fallback" || !(error instanceof ProviderFailure) || !error.safeToFallback) throw error;
-      accepted = await sendAutoSend(env, message);
+  if (message.step_number > 1) {
+    // Day 3/5/7 follow-ups always go through AutoSend under the dedicated follow-up sender identity.
+    accepted = await sendAutoSend(env, message, env.AUTOSEND_FOLLOWUP_FROM_EMAIL || env.AUTOSEND_DEFAULT_FROM_EMAIL);
+  } else {
+    const mode = String(env.EMAIL_PROVIDER_MODE || "agentmail_only");
+    if (mode === "autosend_only") accepted = await sendAutoSend(env, message, env.AUTOSEND_DEFAULT_FROM_EMAIL);
+    else {
+      try { accepted = await sendAgentMail(env, message); }
+      catch (error) {
+        if (mode !== "agentmail_with_autosend_fallback" || !(error instanceof ProviderFailure) || !error.safeToFallback) throw error;
+        accepted = await sendAutoSend(env, message, env.AUTOSEND_DEFAULT_FROM_EMAIL);
+      }
     }
   }
   await neonTransaction(env, async (client) => {
@@ -74,11 +79,12 @@ async function sendAgentMail(env: Env, message: MessageRow) {
   return { provider: "agentmail", messageId: data.message_id };
 }
 
-async function sendAutoSend(env: Env, message: MessageRow) {
-  if (!env.AUTOSEND_API_KEY || !env.AUTOSEND_DEFAULT_FROM_EMAIL) throw new ProviderFailure("AutoSend is not configured.", false);
+async function sendAutoSend(env: Env, message: MessageRow, fromEmail?: string) {
+  const from = fromEmail || env.AUTOSEND_DEFAULT_FROM_EMAIL;
+  if (!env.AUTOSEND_API_KEY || !from) throw new ProviderFailure("AutoSend is not configured.", false);
   const response = await fetch(`${env.AUTOSEND_API_BASE}/mails/send`, {
     method: "POST", headers: { Authorization: `Bearer ${env.AUTOSEND_API_KEY}`, "Content-Type": "application/json", Accept: "application/json", "Idempotency-Key": message.idempotency_key },
-    body: JSON.stringify({ to: { email: message.email, name: `${message.first_name} ${message.last_name}` }, from: { email: env.AUTOSEND_DEFAULT_FROM_EMAIL, name: env.FROM_NAME }, replyTo: { email: env.REPLY_TO_EMAIL, name: env.FROM_NAME }, subject: message.subject, text: message.body }),
+    body: JSON.stringify({ to: { email: message.email, name: `${message.first_name} ${message.last_name}` }, from: { email: from, name: env.FROM_NAME }, replyTo: { email: env.REPLY_TO_EMAIL, name: env.FROM_NAME }, subject: message.subject, text: message.body }),
     signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok) throw new ProviderFailure(`AutoSend returned HTTP ${response.status}.`, false);

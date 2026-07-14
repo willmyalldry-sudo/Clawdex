@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.2",
+    "@opencoredev/email-sdk": "^0.6.5",
     "agentmail": "^0.5.14",
     "agents": "^0.17.4",
     "ai": "^6.0.225",

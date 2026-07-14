@@ -20,6 +20,13 @@ export function DashboardPage({ dashboard, leads, activity, onNavigate, onAction
       <MetricCard label="New signals" value={dashboard.metrics.newSignals} detail="detected this week" icon={<Radar size={20} />} tone="purple" trend={24} />
       <MetricCard label="Booked reviews" value={dashboard.metrics.upcomingBookings} detail="upcoming appointments" icon={<CalendarCheck size={20} />} tone="orange" trend={3} />
     </section>
+    <section className="metrics-grid">
+      <MetricCard label="Live signals gathered" value={dashboard.metrics.signalsGathered} detail="total, all-time" icon={<SignalIcon size={20} />} tone="purple" />
+      <MetricCard label="Leads extracted" value={dashboard.metrics.leadsExtracted} detail="candidates discovered from signals" icon={<DatabaseZap size={20} />} tone="blue" />
+      <MetricCard label="Leads enriched" value={dashboard.metrics.leadsEnriched} detail="matched via Apollo / PDL" icon={<UserCheck size={20} />} tone="green" />
+      <MetricCard label="Email validated" value={dashboard.metrics.leadsValidated} detail="Bouncer / Clearout verified" icon={<MailCheck size={20} />} tone="orange" />
+      <MetricCard label="Emails delivered" value={dashboard.metrics.delivered} detail="confirmed by provider webhook" icon={<Send size={20} />} tone="blue" />
+    </section>
     <section className="dashboard-grid">
       <article className="panel attention-panel">
         <div className="panel-header"><div><span className="section-kicker">Fail-closed controls</span><h2>Automatically blocked</h2></div><span className="count-pill">{dashboard.metrics.pendingApprovals + dashboard.metrics.sourceCandidates}</span></div>

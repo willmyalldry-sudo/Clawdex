@@ -86,7 +86,11 @@ export interface Source {
 }
 
 export interface DashboardData {
-  metrics: { totalLeads: number; highIntent: number; newSignals: number; upcomingBookings: number; pendingApprovals: number; sent: number; replies: number; sourceCandidates: number };
+  metrics: {
+    totalLeads: number; highIntent: number; newSignals: number; upcomingBookings: number; pendingApprovals: number;
+    sent: number; replies: number; sourceCandidates: number;
+    signalsGathered: number; leadsExtracted: number; leadsEnriched: number; leadsValidated: number; delivered: number;
+  };
   funnel: Array<{ label: string; value: number }>;
   generatedAt: string;
 }

@@ -46,13 +46,13 @@
 
 ## Production blockers
 
-- [ ] `PARALLEL_API_KEY`
-- [ ] `BOUNCER_API_KEY`
+- [x] `PARALLEL_API_KEY`
+- [x] `BOUNCER_API_KEY`
 - [ ] Optional PDL/AutoSend/Calendly credentials if enabled
 - [ ] SPF, DKIM, DMARC and sender identity verification
 - [ ] Imported global suppression lists
-- [ ] Cloudflare Access policy reviewed in dashboard
-- [ ] `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` set to the real Access application values (Worker fails closed on every operational route while these are empty)
+- [x] Cloudflare Access policy reviewed in dashboard
+- [x] `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` set to the real Access application values (Worker fails closed on every operational route while these are empty)
 - [ ] Compliance/supervisory activation approval
 - [ ] End-to-end internal sequence tests
 - [ ] Visual desktop/mobile browser QA (browser connector unavailable during this release run)

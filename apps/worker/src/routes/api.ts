@@ -45,11 +45,22 @@ api.get("/dashboard", async (c) => {
        (SELECT count(*) FROM outbound_messages WHERE preflight_status='blocked')::text AS blocked_messages,
        (SELECT count(*) FROM outbound_messages WHERE sent_at IS NOT NULL)::text AS sent,
        (SELECT count(*) FROM message_events WHERE event_type IN ('reply','positive_reply','negative_reply'))::text AS replies,
-       (SELECT count(*) FROM signal_sources WHERE policy_status='quarantined')::text AS quarantined_sources`,
+       (SELECT count(*) FROM signal_sources WHERE policy_status='quarantined')::text AS quarantined_sources,
+       (SELECT count(*) FROM signal_events)::text AS signals_gathered,
+       (SELECT count(*) FROM teacher_candidates)::text AS leads_extracted,
+       (SELECT count(DISTINCT teacher_profile_id) FROM enrichment_results)::text AS leads_enriched,
+       (SELECT count(*) FROM email_validations WHERE validation_status='valid')::text AS leads_validated,
+       (SELECT count(*) FROM message_events WHERE event_type='delivered')::text AS delivered`,
   );
   const row = result.rows[0] ?? {};
   return c.json({
-    metrics: { totalLeads: number(row.total_leads), highIntent: number(row.high_intent), newSignals: number(row.new_signals), upcomingBookings: number(row.bookings), pendingApprovals: number(row.blocked_messages), sent: number(row.sent), replies: number(row.replies), sourceCandidates: number(row.quarantined_sources) },
+    metrics: {
+      totalLeads: number(row.total_leads), highIntent: number(row.high_intent), newSignals: number(row.new_signals),
+      upcomingBookings: number(row.bookings), pendingApprovals: number(row.blocked_messages), sent: number(row.sent),
+      replies: number(row.replies), sourceCandidates: number(row.quarantined_sources),
+      signalsGathered: number(row.signals_gathered), leadsExtracted: number(row.leads_extracted),
+      leadsEnriched: number(row.leads_enriched), leadsValidated: number(row.leads_validated), delivered: number(row.delivered),
+    },
     funnel: await funnel(c.env), generatedAt: nowIso(),
   });
 });

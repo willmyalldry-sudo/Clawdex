@@ -121,6 +121,18 @@ const STATIC_SEARCHES: readonly RetirementSearchPlan[] = [
   { id: "nv-pdf-retirement", category: "board_records", query: "filetype:pdf Nevada school retirement personnel", sourceType: "district" },
   { id: "nv-pdf-incentive", category: "workforce", query: "filetype:pdf Nevada school early retirement incentive", sourceType: "district" },
   { id: "nv-pdf-service", category: "service_milestone", query: "filetype:pdf Nevada educator years service retirement", sourceType: "district" },
+  { id: "k12-retirement", category: "district", query: "site:*.k12.nv.us retirement", sourceType: "district" },
+  { id: "k12-pers", category: "eligibility", query: "site:*.k12.nv.us PERS", sourceType: "district" },
+  { id: "edu-nvpers", category: "eligibility", query: "site:*.edu \"Nevada PERS\"", sourceType: "district" },
+  { id: "nvgov-pers", category: "official_guidance", query: "site:nv.gov \"Nevada PERS\"", sourceType: "retirement" },
+  { id: "nvgov-teacher-retirement", category: "official_guidance", query: "site:nv.gov teacher retirement", sourceType: "retirement" },
+  { id: "nvpers-org-retirement", category: "official_guidance", query: "site:nvpers.org retirement", sourceType: "retirement" },
+  { id: "pdf-ready-to-retire", category: "events", query: "filetype:pdf \"Ready to Retire\" NVPERS", sourceType: "retirement" },
+  { id: "pdf-retirement-resignation", category: "board_records", query: "filetype:pdf \"retirement resignation\" Nevada school", sourceType: "district" },
+  { id: "pdf-retirement-application", category: "board_records", query: "filetype:pdf \"retirement application\" Nevada PERS", sourceType: "retirement" },
+  { id: "nsea-workshop", category: "events", query: "NSEA retirement workshop", sourceType: "benefits" },
+  { id: "nsea-pers", category: "eligibility", query: "NSEA PERS", sourceType: "benefits" },
+  { id: "notice-intent-retire", category: "board_records", query: "\"notice of intent to retire\" Nevada school", sourceType: "district" },
 ] as const;
 
 const SIGNAL_DEFINITIONS: readonly SignalDefinition[] = [
@@ -256,7 +268,7 @@ const SIGNAL_DEFINITIONS: readonly SignalDefinition[] = [
 
 const NEVADA_CONTEXT = /\bNevada\b|\bNVPERS\b|\bNV\s*PERS\b|\bnvpers\.org\b|\b(?:Clark|Washoe|Lyon|Carson City|Douglas|Elko|Nye|Churchill|Humboldt|Mineral|Pershing|Storey|White Pine|Lander|Lincoln|Esmeralda|Eureka) County School District\b/i;
 const EDUCATOR_CONTEXT = /\bteacher\b|\beducator\b|\bprincipal\b|\bsuperintendent\b|\bschool district\b|\bpublic school\b|\blicensed personnel\b|\bcertified personnel\b|\bfaculty\b/i;
-const EXCLUSION_CONTEXT = /Texas TRS|Teacher Retirement System of Texas|Rule of 80|Rule of 85|CalSTRS|CalPERS|Arizona State Retirement System|Florida Retirement System|NYSTRS|DROP program|police retirement|firefighter retirement|private school retirement|military retirement|federal employee retirement|retired jersey|software retirement|retirement community|retirement home/i;
+const EXCLUSION_CONTEXT = /Texas TRS|Teacher Retirement System of Texas|TexasTeachers|Rule of 80|Rule of 85|CalSTRS|CalPERS|Arizona State Retirement System|Florida Retirement System|NYSTRS|DROP program|police retirement|firefighter retirement|private school retirement|military retirement|federal employee retirement|retired jersey|software retirement|retirement community|retirement home/i;
 
 export function buildNevadaRetirementSearchCatalog(): RetirementSearchPlan[] {
   const districtSearches = NEVADA_SCHOOL_DISTRICTS.flatMap((district) =>
@@ -327,7 +339,11 @@ export function getRetirementSignalDefinitionCount(): number {
 
 export const PARALLEL_RETIREMENT_DISCOVERY_OBJECTIVE = [
   "Find current, publicly accessible pages containing documented Nevada public-educator retirement signals.",
+  "Use Nevada PERS / NVPERS terms only; exclude Texas TRS, Rule of 80, Rule of 85, TexasTeachers, and DROP-program results unless a Nevada source explicitly uses those terms.",
   "Prioritize official NVPERS, Nevada government, public school district, school-board, HR/benefits, IRS, reputable news, and public professional pages.",
+  "Rank highest: an exact retirement date, a submitted or board-approved retirement application, NVPERS Ready to Retire participation, 30 to 33.3 years of service, a public retirement announcement, or a service-credit purchase.",
+  "Rank medium: district retirement workshops, benefit estimates, retiree-health planning, Nevada PERS legislative changes, retirement incentives, layoffs, or restructuring.",
+  "Rank low: generic retirement articles or budget news with no verified educator connection.",
   "For people, return only professional identity, public-employer context, and work contact details explicitly published by the employer for professional contact.",
   "Do not return private or login-gated pages, union member-only directories, personal phone numbers, home addresses, personal financial details, guessed emails, or anonymous-user identities.",
   "A result is research evidence only and must not be marked outreach-eligible without human verification.",
@@ -335,8 +351,10 @@ export const PARALLEL_RETIREMENT_DISCOVERY_OBJECTIVE = [
 
 export const PARALLEL_RETIREMENT_EXTRACTION_OBJECTIVE = [
   "Extract evidence of Nevada public-educator retirement timing, NVPERS eligibility or education events, service milestones, board actions, benefits transitions, 403(b)/457(b) planning, IRS guidance, or workforce pressure.",
+  "Use Nevada PERS / NVPERS terms only; exclude Texas TRS, Rule of 80, Rule of 85, TexasTeachers, and DROP-program content unless a Nevada source explicitly uses those terms.",
   "Preserve source title, publication date, quoted evidence, employer, professional role, and any explicitly published professional work contact information.",
   "Do not extract home addresses, personal phone numbers, personal emails, private financial information, or data behind authentication.",
+  "Never guess an email address, and never treat a district-wide signal as proof that a specific educator is retiring.",
 ].join(" ");
 
 function extractMetadata(text: string): Record<string, string | number | null> {

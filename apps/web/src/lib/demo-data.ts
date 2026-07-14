@@ -1,7 +1,7 @@
 import type { Activity, Approval, Campaign, DashboardData, Lead, Signal, Source } from "./types";
 
 export const demoDashboard: DashboardData = {
-  metrics: { totalLeads: 248, highIntent: 37, newSignals: 18, upcomingBookings: 6, pendingApprovals: 2, sent: 126, replies: 19, sourceCandidates: 8 },
+  metrics: { totalLeads: 248, highIntent: 37, newSignals: 18, upcomingBookings: 6, pendingApprovals: 2, sent: 126, replies: 19, sourceCandidates: 8, signalsGathered: 341, leadsExtracted: 248, leadsEnriched: 196, leadsValidated: 163, delivered: 126 },
   funnel: [
     { label: "Discovered", value: 248 }, { label: "Enriched", value: 196 }, { label: "Validated", value: 163 },
     { label: "Enrolled", value: 91 }, { label: "Replied", value: 19 }, { label: "Booked", value: 6 },
