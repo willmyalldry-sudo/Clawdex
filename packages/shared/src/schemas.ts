@@ -1,5 +1,26 @@
 import { z } from "zod";
 
+// ============================================================================
+// LEGACY V1 SCHEMAS — DEPRECATED
+// ============================================================================
+// This file is kept for reference only. All active code uses signalJobSchema
+// from signal-os.ts. These schemas describe the old human-in-the-loop model
+// and are NOT wired into the current autonomous pipeline.
+//
+// Removal candidate: v2.1.0+
+// Migration path: Any external systems using queueMessageSchema should migrate
+// to signalJobSchema in @agent-os/shared/signal-os.ts
+// ============================================================================
+
+/**
+ * @deprecated Use `signalJobSchema` from signal-os.ts instead
+ * @see packages/shared/src/signal-os.ts
+ *
+ * This schema is NOT used by the autonomous signal pipeline.
+ * The production queue handler (apps/worker/src/index.ts) only recognizes
+ * signalJobSchema kinds: search-query, crawl-source, resolve-teachers,
+ * enrich-teacher, validate-email, qualify-lead, enroll-lead, send-message.
+ */
 export const leadStatusSchema = z.enum([
   "new",
   "enriching",
@@ -79,13 +100,18 @@ export const launchInputSchema = z.object({
   leadIds: z.array(z.string().uuid()).min(1).max(500),
 });
 
+/**
+ * @deprecated Use `signalJobSchema` from signal-os.ts instead
+ * This describes the old discover-web / enrich-lead / validate-email pipeline
+ * which required human review. The current system uses autonomous signal detection.
+ */
 export const queueMessageSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("discover-web"),
     query: z.string().min(3).max(300),
     runId: z.string().uuid(),
     queryId: z.string().max(180).optional(),
-    category: z.enum(["eligibility", "district", "board_records", "events", "service_milestone", "legislation", "workforce", "benefits", "financial_planning", "public_professional", "official_guidance"]).optional(),
+    category: z.enum(["eligibility", "district", "board_records", "events", "service_milestone", "legislation", "workforce", "benefits", "financial_planning", "public_professional", "official_guidance"]),
     sourceType: z.enum(["district", "school", "news", "retirement", "benefits"]).optional(),
   }),
   z.object({ kind: z.literal("crawl-source"), sourceId: z.string().uuid(), runId: z.string().uuid() }),
@@ -97,6 +123,9 @@ export const queueMessageSchema = z.discriminatedUnion("kind", [
 export type LeadInput = z.infer<typeof leadInputSchema>;
 export type SourceInput = z.infer<typeof sourceInputSchema>;
 export type CampaignInput = z.infer<typeof campaignInputSchema>;
+/**
+ * @deprecated Use `SignalJob` from signal-os.ts instead
+ */
 export type QueueMessage = z.infer<typeof queueMessageSchema>;
 
 export interface LeadScoreInput {
