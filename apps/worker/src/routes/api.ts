@@ -5,6 +5,7 @@ import type { AppBindings } from "../lib/auth";
 import { requireAccessUser } from "../lib/auth";
 import { databaseConfigured, neonQuery } from "../lib/neon";
 import { scheduleHourlyRun } from "../lib/autonomous-pipeline";
+import { createParallelTaskRun, getParallelTaskRunResult } from "../lib/parallel-task";
 import { nowIso } from "../lib/utils";
 import { mcpApi } from "./mcp";
 
@@ -154,6 +155,28 @@ for (const route of ["/leads/import", "/campaigns", "/consents"] as const) {
   api.post(route, (c) => c.json({ error: { code: "autonomous_only", message: "Manual lead and campaign writes are disabled in Signal OS v2." } }, 410));
 }
 
+// Manual-trigger only: Parallel's Task Run ("ultra" processor) API is priced per deep multi-step
+// research task, not per page like Search/Extract, so it must never be reachable from the hourly
+// cron's provider-budget logic. A daily count cap here is a second backstop against runaway cost.
+api.post("/research/deep-run", zValidator("json", z.object({ input: z.string().trim().min(10).max(4_000) })), async (c) => {
+  const cap = configNumber(c.env.DEEP_RESEARCH_MAX_RUNS_PER_DAY, 10);
+  const used = await neonQuery<{ count: string }>(c.env,
+    `SELECT count(*)::text AS count FROM provider_usage WHERE provider='parallel' AND operation='task_run_ultra' AND occurred_at >= date_trunc('day', now())`);
+  if (Number(used.rows[0]?.count ?? 0) >= cap) {
+    return c.json({ error: { code: "budget_exceeded", message: `Daily deep-research run cap (${cap}) reached.` } }, 429);
+  }
+  const input = c.req.valid("json").input;
+  const run = await createParallelTaskRun(c.env, input, "ultra");
+  await neonQuery(c.env, `INSERT INTO provider_usage (provider, operation, request_count, result_count, status) VALUES ('parallel','task_run_ultra',1,0,$1)`, [run.status]);
+  await neonQuery(c.env, `INSERT INTO audit_log (entity_type, entity_id, action, rule_version, metadata) VALUES ('parallel_task_run',$1,'deep_research.started','signal-os-v2',$2)`, [run.runId, JSON.stringify({ input })]);
+  return c.json({ runId: run.runId, status: run.status }, 202);
+});
+
+api.get("/research/deep-run/:runId", async (c) => {
+  const result = await getParallelTaskRunResult(c.env, c.req.param("runId"), 20);
+  return c.json(result);
+});
+
 async function funnel(env: Env) {
   const rows = await neonQuery<Record<string, string>>(env,
     `SELECT (SELECT count(*) FROM teacher_candidates)::text AS discovered,
@@ -166,3 +189,4 @@ async function funnel(env: Env) {
   return [["Discovered",row.discovered],["Enriched",row.enriched],["Validated",row.validated],["Enrolled",row.enrolled],["Replied",row.replied],["Booked",row.booked]].map(([label,value]) => ({ label, value: number(value) }));
 }
 function number(value: unknown): number { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
+function configNumber(value: unknown, fallback: number): number { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
